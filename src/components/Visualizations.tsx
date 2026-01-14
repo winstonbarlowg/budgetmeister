@@ -48,20 +48,20 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
 
   const selectedMonth = yearData[selectedMonthIndex] || currentMonth;
 
-  // Modern pastel fintech color palette - soft, professional, accessible
+  // Modern diverse fintech color palette - solid yet approachable
   const chartColors = [
-    '#93c5fd', // blue-300 - soft blue
-    '#86efac', // green-300 - mint green
-    '#fda4af', // rose-300 - soft pink
-    '#fcd34d', // amber-300 - pastel yellow
-    '#c4b5fd', // violet-300 - lavender
-    '#67e8f9', // cyan-300 - aqua
-    '#fdba74', // orange-300 - peach
-    '#a5b4fc', // indigo-300 - periwinkle
-    '#f9a8d4', // pink-300 - blush
-    '#a7f3d0', // emerald-300 - seafoam
-    '#7dd3fc', // sky-300 - sky blue
-    '#d8b4fe', // purple-300 - lilac
+    '#60a5fa', // blue-400 - medium blue
+    '#34d399', // emerald-400 - teal green
+    '#f472b6', // pink-400 - magenta
+    '#fbbf24', // amber-400 - gold
+    '#a78bfa', // violet-400 - purple
+    '#22d3ee', // cyan-400 - turquoise
+    '#fb923c', // orange-400 - coral
+    '#818cf8', // indigo-400 - indigo
+    '#fb7185', // rose-400 - rose
+    '#4ade80', // green-400 - lime
+    '#38bdf8', // sky-400 - light blue
+    '#c084fc', // purple-400 - orchid
   ];
 
   // 1. Monthly Budget vs Actual Bar Chart
@@ -81,11 +81,11 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   const budgetVsActualConfig = {
     Fixed: {
       label: "Fixed Expenses",
-      color: "#fda4af", // rose-300 - soft pink
+      color: "#fb7185", // rose-400 - rose
     },
     Variable: {
       label: "Variable Expenses",
-      color: "#93c5fd", // blue-300 - soft blue
+      color: "#60a5fa", // blue-400 - medium blue
     },
   } satisfies ChartConfig;
 
@@ -117,11 +117,11 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   const fixedVsVariableConfig = {
     Fixed: {
       label: "Fixed Expenses",
-      color: "#fda4af", // rose-300 - soft pink
+      color: "#fb7185", // rose-400 - rose
     },
     Variable: {
       label: "Variable Expenses",
-      color: "#93c5fd", // blue-300 - soft blue
+      color: "#60a5fa", // blue-400 - medium blue
     },
   } satisfies ChartConfig;
 
@@ -135,11 +135,11 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   const trendConfig = {
     budget: {
       label: "Budget",
-      color: "#d1d5db", // gray-300 - soft gray
+      color: "#9ca3af", // gray-400 - medium gray
     },
     actual: {
       label: "Actual",
-      color: "#93c5fd", // blue-300 - soft blue
+      color: "#60a5fa", // blue-400 - medium blue
     },
   } satisfies ChartConfig;
 
@@ -148,7 +148,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
     .map((c) => ({
       name: c.name,
       variance: c.variance,
-      color: c.variance > 0 ? '#fda4af' : '#86efac', // rose-300 for over, green-300 for under
+      color: c.variance > 0 ? '#fb7185' : '#34d399', // rose-400 for over, emerald-400 for under
     }))
     .sort((a, b) => b.variance - a.variance);
 
@@ -177,11 +177,11 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   });
 
   const getHeatmapColor = (percentVariance: number) => {
-    if (percentVariance <= -20) return '#86efac'; // green-300 - mint green
-    if (percentVariance <= -10) return '#a7f3d0'; // emerald-300 - seafoam
-    if (percentVariance <= 10) return '#fcd34d'; // amber-300 - pastel yellow
-    if (percentVariance <= 20) return '#fdba74'; // orange-300 - peach
-    return '#fda4af'; // rose-300 - soft pink
+    if (percentVariance <= -20) return '#34d399'; // emerald-400 - strong green (very good)
+    if (percentVariance <= -10) return '#4ade80'; // green-400 - lime (good)
+    if (percentVariance <= 10) return '#fbbf24'; // amber-400 - gold (neutral)
+    if (percentVariance <= 20) return '#fb923c'; // orange-400 - coral (caution)
+    return '#fb7185'; // rose-400 - rose (over budget)
   };
 
   return (
