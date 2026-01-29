@@ -144,7 +144,9 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   } satisfies ChartConfig;
 
   // 5. Variance Waterfall (simplified as bar chart showing variance per category)
+  // Only show variable expenses since fixed expenses are expected to have no variance
   const varianceData = selectedMonth.categories
+    .filter((c) => c.type === 'variable')
     .map((c) => ({
       name: c.name,
       variance: c.variance,
@@ -338,8 +340,8 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
         {/* 5. Category Variance */}
         <Card>
           <CardHeader>
-            <CardTitle>Category Variance</CardTitle>
-            <CardDescription>{getMonthName(selectedMonth.month)} {selectedMonth.year}</CardDescription>
+            <CardTitle>Variable Expense Variance</CardTitle>
+            <CardDescription>Track spending variance for variable categories - {getMonthName(selectedMonth.month)} {selectedMonth.year}</CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={{}} className="min-h-[400px] w-full">
