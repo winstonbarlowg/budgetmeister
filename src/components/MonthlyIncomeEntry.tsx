@@ -161,8 +161,8 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
               </Button>
             </div>
 
-            <div className="grid grid-cols-5 gap-3">
-              <div className="space-y-2">
+            <div className="grid grid-cols-5 gap-2">
+              <div className="space-y-2 rounded-md bg-slate-100/80 p-3">
                 <Label htmlFor={`${source.id}-gross`} className="text-xs">Gross Income</Label>
                 <CurrencyInput
                   id={`${source.id}-gross`}
@@ -172,7 +172,7 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-md bg-slate-100/80 p-3">
                 <Label htmlFor={`${source.id}-pension`} className="text-xs">Pension</Label>
                 <CurrencyInput
                   id={`${source.id}-pension`}
@@ -182,7 +182,7 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-md bg-slate-100/80 p-3">
                 <Label htmlFor={`${source.id}-ni`} className="text-xs">National Insurance</Label>
                 <CurrencyInput
                   id={`${source.id}-ni`}
@@ -192,7 +192,7 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-md bg-slate-100/80 p-3">
                 <Label htmlFor={`${source.id}-tax`} className="text-xs">Tax</Label>
                 <CurrencyInput
                   id={`${source.id}-tax`}
@@ -202,7 +202,7 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-md bg-slate-100/80 p-3">
                 <Label htmlFor={`${source.id}-net`} className="text-xs font-semibold">Net Take-Home</Label>
                 <CurrencyInput
                   id={`${source.id}-net`}
