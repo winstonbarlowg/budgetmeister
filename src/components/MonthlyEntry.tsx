@@ -98,7 +98,8 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
       year: monthData.year,
       month: monthData.month,
       expenses: categories.map(c => ({ categoryId: c.id, actualAmount: expenses[c.id] || 0 })),
-      income: monthData.income || []
+      income: monthData.income || [],
+      moneyMovements: monthData.moneyMovements || []
     }
   );
 
