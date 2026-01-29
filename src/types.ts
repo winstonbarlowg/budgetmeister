@@ -39,11 +39,22 @@ export interface IncomeWithSource extends MonthlyIncome {
   sourceColor?: string;
 }
 
+export interface MoneyMovement {
+  id: string;
+  amount: number;
+  sourceAccount: string;
+  destinationAccount: string;
+  type: 'savings' | 'investment';
+  category: string;
+  notes?: string;
+}
+
 export interface MonthData {
   year: number;
   month: number; // 1-12
   expenses: MonthlyExpense[];
   income: MonthlyIncome[];
+  moneyMovements: MoneyMovement[];
 }
 
 export interface BudgetConfig {
@@ -78,4 +89,8 @@ export interface MonthSummary {
   totalDeductions: number;
   disposableIncome: number;
   incomeBreakdown: IncomeWithSource[];
+  totalSavings: number;
+  totalInvestments: number;
+  totalMoneyMovements: number;
+  netDisposableIncome: number;
 }

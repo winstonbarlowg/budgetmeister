@@ -100,6 +100,11 @@ export class FileSystemManager {
         data.income = [];
       }
 
+      // Backwards compatibility: add moneyMovements if missing
+      if (!data.moneyMovements) {
+        data.moneyMovements = [];
+      }
+
       return data;
     } catch {
       // Return empty month data if file doesn't exist
@@ -108,6 +113,7 @@ export class FileSystemManager {
         month,
         expenses: [],
         income: [],
+        moneyMovements: [],
       };
     }
   }

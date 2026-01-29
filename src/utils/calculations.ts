@@ -48,6 +48,18 @@ export function calculateMonthSummary(
   );
   const disposableIncome = totalIncomeNet - totalActual;
 
+  // Money movements calculations
+  const totalSavings = (monthData.moneyMovements || [])
+    .filter(m => m.type === 'savings')
+    .reduce((sum, m) => sum + m.amount, 0);
+
+  const totalInvestments = (monthData.moneyMovements || [])
+    .filter(m => m.type === 'investment')
+    .reduce((sum, m) => sum + m.amount, 0);
+
+  const totalMoneyMovements = totalSavings + totalInvestments;
+  const netDisposableIncome = disposableIncome - totalMoneyMovements;
+
   return {
     year: monthData.year,
     month: monthData.month,
@@ -64,6 +76,10 @@ export function calculateMonthSummary(
     totalDeductions,
     disposableIncome,
     incomeBreakdown: incomeWithSource,
+    totalSavings,
+    totalInvestments,
+    totalMoneyMovements,
+    netDisposableIncome,
   };
 }
 
