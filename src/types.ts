@@ -107,6 +107,7 @@ export interface RawTransaction {
   rawDescription: string;
   amount: number;
   type: 'debit' | 'credit';
+  transactionType?: 'expense' | 'refund' | 'payment' | 'transfer';  // Bank-specific interpretation
   balance?: number;
   source: 'csv-import';
   importBatchId: string;
@@ -122,6 +123,7 @@ export interface CategorizedTransaction extends RawTransaction {
   isApplied: boolean;
   isDuplicate?: boolean;          // Flagged as duplicate within same import
   duplicateSource?: string;       // Where duplicate was found (e.g., 'same-import')
+  isExcluded?: boolean;           // User manually excluded this transaction from being applied
 }
 
 export interface CategorizationRule {

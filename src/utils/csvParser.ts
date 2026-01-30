@@ -120,8 +120,12 @@ export function parseAmexUK(rows: string[][], importBatchId: string): RawTransac
 
     if (!dateStr || !description || !amountStr) continue;
 
-    const amount = Math.abs(parseFloat(amountStr.replace(/[^0-9.-]/g, '')));
-    const isDebit = parseFloat(amountStr) < 0;
+    const rawAmount = parseFloat(amountStr.replace(/[^0-9.-]/g, ''));
+    const amount = Math.abs(rawAmount);
+
+    // Amex UK logic: Positive amounts = expenses (debits), Negative amounts = refunds/payments (credits)
+    const isDebit = rawAmount > 0;
+    const transactionType = rawAmount > 0 ? 'expense' : (rawAmount < 0 ? 'refund' : 'expense');
 
     transactions.push({
       id: `${importBatchId}-${i}`,
@@ -130,6 +134,7 @@ export function parseAmexUK(rows: string[][], importBatchId: string): RawTransac
       rawDescription: description,
       amount,
       type: isDebit ? 'debit' : 'credit',
+      transactionType,
       source: 'csv-import',
       importBatchId,
       bankSource: 'amex-uk'
@@ -168,6 +173,7 @@ export function parseBarclays(rows: string[][], importBatchId: string): RawTrans
       rawDescription: description,
       amount,
       type: isDebit ? 'debit' : 'credit',
+      transactionType: isDebit ? 'expense' : 'refund',
       source: 'csv-import',
       importBatchId,
       bankSource: 'barclays'
@@ -218,6 +224,7 @@ export function parseHSBC(rows: string[][], importBatchId: string): RawTransacti
       rawDescription: description,
       amount,
       type,
+      transactionType: type === 'debit' ? 'expense' : 'refund',
       source: 'csv-import',
       importBatchId,
       bankSource: 'hsbc'
@@ -256,6 +263,7 @@ export function parseMonzo(rows: string[][], importBatchId: string): RawTransact
       rawDescription: description,
       amount,
       type: isDebit ? 'debit' : 'credit',
+      transactionType: isDebit ? 'expense' : 'refund',
       source: 'csv-import',
       importBatchId,
       bankSource: 'monzo'
@@ -294,6 +302,7 @@ export function parseStarling(rows: string[][], importBatchId: string): RawTrans
       rawDescription: description,
       amount,
       type: isDebit ? 'debit' : 'credit',
+      transactionType: isDebit ? 'expense' : 'refund',
       source: 'csv-import',
       importBatchId,
       bankSource: 'starling'
@@ -336,6 +345,7 @@ export function parseGeneric(rows: string[][], importBatchId: string): RawTransa
       rawDescription: description,
       amount,
       type: isDebit ? 'debit' : 'credit',
+      transactionType: isDebit ? 'expense' : 'refund',
       source: 'csv-import',
       importBatchId,
       bankSource: 'generic'
@@ -346,7 +356,10 @@ export function parseGeneric(rows: string[][], importBatchId: string): RawTransa
 }
 
 // Main entry point
-export async function parseBankCSV(file: File): Promise<{ transactions: RawTransaction[]; bankSource: string | null }> {
+export async function parseBankCSV(
+  file: File,
+  bankOverride?: string | null
+): Promise<{ transactions: RawTransaction[]; bankSource: string | null }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -364,7 +377,8 @@ export async function parseBankCSV(file: File): Promise<{ transactions: RawTrans
           return;
         }
 
-        const bankSource = detectBankFormat(csvContent);
+        // Use manual override if provided, otherwise auto-detect
+        const bankSource = bankOverride || detectBankFormat(csvContent);
         if (!bankSource) {
           reject(new Error('Unable to detect bank format. Please ensure CSV has Date, Description, and Amount columns.'));
           return;

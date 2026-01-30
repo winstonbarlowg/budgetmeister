@@ -38,6 +38,8 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   const [ignoreDuplicates, setIgnoreDuplicates] = useState(false);
   const [importHistory, setImportHistory] = useState<ImportSession[]>([]);
   const [removingSessionId, setRemovingSessionId] = useState<string | null>(null);
+  const [detectedBank, setDetectedBank] = useState<string | null>(null);
+  const [selectedBank, setSelectedBank] = useState<string | null>(null);
 
   // Load import history on mount and when import is applied
   useEffect(() => {
@@ -91,9 +93,10 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
     setFileName(file.name);
 
     try {
-      // 1. Parse CSV
-      const { transactions, bankSource: detectedBank } = await parseBankCSV(file);
-      setBankSource(detectedBank);
+      // 1. Parse CSV with bank override if selected
+      const { transactions, bankSource: detectedBankSource } = await parseBankCSV(file, selectedBank);
+      setDetectedBank(detectedBankSource);
+      setBankSource(selectedBank || detectedBankSource);
 
       // 2. Auto-categorize
       const transactionConfig = await fileSystemManager.loadTransactionConfig();
@@ -106,11 +109,12 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
       // 3. Detect duplicates within same import
       const duplicates = detectDuplicates(categorized);
 
-      // 4. Mark transactions as duplicates
+      // 4. Mark transactions as duplicates and initialize exclusion state
       const withDuplicateFlags = categorized.map(t => ({
         ...t,
         isDuplicate: duplicates.get(t.id)?.isDuplicate || false,
-        duplicateSource: duplicates.get(t.id)?.duplicateSource?.categoryId
+        duplicateSource: duplicates.get(t.id)?.duplicateSource?.categoryId,
+        isExcluded: false // Initialize as not excluded
       }));
 
       // 5. Set state
@@ -155,6 +159,19 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
     }
   };
 
+  const handleBankChange = (bank: string) => {
+    setSelectedBank(bank);
+    // Re-parse with new bank selection if file is uploaded
+    // Note: This would require storing the file, or just letting user re-upload
+  };
+
+  const handleExcludeToggle = (transactionId: string, excluded: boolean) => {
+    const updatedTransactions = importedTransactions.map(t =>
+      t.id === transactionId ? { ...t, isExcluded: excluded } : t
+    );
+    setImportedTransactions(updatedTransactions);
+  };
+
   const handleCancelImport = () => {
     // Confirmation dialog
     if (importedTransactions.length > 0) {
@@ -168,6 +185,8 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
     setImportSessionId(null);
     setFileName('');
     setBankSource(null);
+    setDetectedBank(null);
+    setSelectedBank(null);
     setFilter('all');
     setIgnoreDuplicates(false);
   };
@@ -176,10 +195,11 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
     if (!importSessionId) return;
 
     try {
-      // Filter out duplicates if ignore flag is set
-      const transactionsToApply = ignoreDuplicates
-        ? importedTransactions.filter(t => !t.isDuplicate)
-        : importedTransactions;
+      // Filter out excluded transactions and optionally duplicates
+      let transactionsToApply = importedTransactions.filter(t => !t.isExcluded);
+      if (ignoreDuplicates) {
+        transactionsToApply = transactionsToApply.filter(t => !t.isDuplicate);
+      }
 
       // Apply to current month
       await onApplyToMonth(transactionsToApply, currentYear, currentMonth);
@@ -224,12 +244,13 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
           <CardDescription>Upload CSV files from UK banks or Amex</CardDescription>
         </CardHeader>
         <CardContent>
-          <TransactionUpload onUpload={handleFileUpload} isProcessing={isProcessing} />
-          {bankSource && (
-            <div className="mt-4 text-sm text-muted-foreground">
-              Detected format: <span className="font-semibold">{bankSource}</span>
-            </div>
-          )}
+          <TransactionUpload
+            onUpload={handleFileUpload}
+            isProcessing={isProcessing}
+            detectedBank={detectedBank}
+            selectedBank={selectedBank}
+            onBankChange={handleBankChange}
+          />
         </CardContent>
       </Card>
 
@@ -251,6 +272,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
             filter={filter}
             onFilterChange={(newFilter) => setFilter(newFilter as 'all' | 'high' | 'medium' | 'low' | 'uncategorized')}
             onCategoryChange={handleCategoryChange}
+            onExcludeToggle={handleExcludeToggle}
           />
 
           {hasDuplicates && (

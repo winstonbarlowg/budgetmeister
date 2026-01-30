@@ -9,6 +9,7 @@ interface TransactionReviewTableProps {
   filter: string;
   onFilterChange: (filter: string) => void;
   onCategoryChange: (transactionId: string, categoryId: string) => void;
+  onExcludeToggle: (transactionId: string, excluded: boolean) => void;
 }
 
 export const TransactionReviewTable: React.FC<TransactionReviewTableProps> = ({
@@ -16,7 +17,8 @@ export const TransactionReviewTable: React.FC<TransactionReviewTableProps> = ({
   categories,
   filter,
   onFilterChange,
-  onCategoryChange
+  onCategoryChange,
+  onExcludeToggle
 }) => {
   // Filter transactions based on confidence
   const filteredTransactions = transactions.filter(t => {
@@ -71,6 +73,7 @@ export const TransactionReviewTable: React.FC<TransactionReviewTableProps> = ({
                 transaction={transaction}
                 categories={categories}
                 onCategoryChange={onCategoryChange}
+                onExcludeToggle={onExcludeToggle}
               />
             ))}
           </div>

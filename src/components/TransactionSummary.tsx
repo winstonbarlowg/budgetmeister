@@ -14,13 +14,20 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
     lowConfidence: transactions.filter(t => (t.confidence || 0) > 0 && (t.confidence || 0) <= 0.5).length,
     uncategorized: transactions.filter(t => !t.suggestedCategoryId).length,
     totalAmount: transactions.reduce((sum, t) => sum + (t.type === 'debit' ? t.amount : 0), 0),
-    duplicates: transactions.filter(t => t.isDuplicate).length
+    duplicates: transactions.filter(t => t.isDuplicate).length,
+    excluded: transactions.filter(t => t.isExcluded).length,
+    refunds: transactions.filter(t => t.transactionType === 'refund' || t.transactionType === 'payment').length
   };
 
   const hasDuplicates = stats.duplicates > 0;
+  const hasExcluded = stats.excluded > 0;
+
+  const gridCols = hasDuplicates && hasExcluded ? 'md:grid-cols-6' :
+                   hasDuplicates || hasExcluded ? 'md:grid-cols-5' :
+                   'md:grid-cols-4';
 
   return (
-    <div className={`grid gap-4 ${hasDuplicates ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+    <div className={`grid gap-4 ${gridCols}`}>
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>Total Transactions</CardDescription>
@@ -73,6 +80,18 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Found in same import</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {hasExcluded && (
+        <Card className="border-gray-300 bg-gray-50">
+          <CardHeader className="pb-2">
+            <CardDescription>Excluded</CardDescription>
+            <CardTitle className="text-3xl text-gray-600">{stats.excluded}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Won't be applied</p>
           </CardContent>
         </Card>
       )}
