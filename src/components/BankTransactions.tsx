@@ -38,8 +38,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   const [ignoreDuplicates, setIgnoreDuplicates] = useState(false);
   const [importHistory, setImportHistory] = useState<ImportSession[]>([]);
   const [removingSessionId, setRemovingSessionId] = useState<string | null>(null);
-  const [detectedBank, setDetectedBank] = useState<string | null>(null);
-  const [selectedBank, setSelectedBank] = useState<string | null>(null);
+  const [selectedBank, setSelectedBank] = useState<string>('auto');
 
   // Load import history on mount and when import is applied
   useEffect(() => {
@@ -93,10 +92,10 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
     setFileName(file.name);
 
     try {
-      // 1. Parse CSV with bank override if selected
-      const { transactions, bankSource: detectedBankSource } = await parseBankCSV(file, selectedBank);
-      setDetectedBank(detectedBankSource);
-      setBankSource(selectedBank || detectedBankSource);
+      // 1. Parse CSV with bank selection (null = auto-detect, otherwise use selected)
+      const bankOverride = selectedBank === 'auto' ? null : selectedBank;
+      const { transactions, bankSource: detectedBankSource } = await parseBankCSV(file, bankOverride);
+      setBankSource(detectedBankSource);
 
       // 2. Auto-categorize
       const transactionConfig = await fileSystemManager.loadTransactionConfig();
@@ -161,8 +160,6 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
 
   const handleBankChange = (bank: string) => {
     setSelectedBank(bank);
-    // Re-parse with new bank selection if file is uploaded
-    // Note: This would require storing the file, or just letting user re-upload
   };
 
   const handleExcludeToggle = (transactionId: string, excluded: boolean) => {
@@ -185,8 +182,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
     setImportSessionId(null);
     setFileName('');
     setBankSource(null);
-    setDetectedBank(null);
-    setSelectedBank(null);
+    setSelectedBank('auto');
     setFilter('all');
     setIgnoreDuplicates(false);
   };
@@ -247,7 +243,6 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
           <TransactionUpload
             onUpload={handleFileUpload}
             isProcessing={isProcessing}
-            detectedBank={detectedBank}
             selectedBank={selectedBank}
             onBankChange={handleBankChange}
           />

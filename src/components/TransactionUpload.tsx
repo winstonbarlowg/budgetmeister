@@ -6,19 +6,18 @@ import { getBankDisplayName } from '../utils/csvParser';
 interface TransactionUploadProps {
   onUpload: (file: File) => void;
   isProcessing?: boolean;
-  detectedBank?: string | null;
-  selectedBank?: string | null;
-  onBankChange?: (bank: string) => void;
+  selectedBank: string | null;
+  onBankChange: (bank: string) => void;
 }
 
 export const TransactionUpload: React.FC<TransactionUploadProps> = ({
   onUpload,
   isProcessing = false,
-  detectedBank,
   selectedBank,
   onBankChange
 }) => {
   const bankOptions = [
+    { value: 'auto', label: 'Auto-detect bank format' },
     { value: 'amex-uk', label: getBankDisplayName('amex-uk') },
     { value: 'barclays', label: getBankDisplayName('barclays') },
     { value: 'hsbc', label: getBankDisplayName('hsbc') },
@@ -49,59 +48,61 @@ export const TransactionUpload: React.FC<TransactionUploadProps> = ({
   };
 
   return (
-    <div
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
-    >
-      <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-      <p className="text-sm text-muted-foreground mb-4">
-        {isProcessing ? 'Processing...' : 'Drag & drop CSV file here, or click to browse'}
-      </p>
-      <input
-        type="file"
-        accept=".csv"
-        onChange={handleFileSelect}
-        className="hidden"
-        id="csv-upload"
-        disabled={isProcessing}
-      />
-      <label htmlFor="csv-upload">
-        <Button variant="outline" disabled={isProcessing} type="button" onClick={(e) => {
-          if (!isProcessing) {
-            document.getElementById('csv-upload')?.click();
-          }
-          e.preventDefault();
-        }}>
-          Choose File
-        </Button>
-      </label>
-      <p className="text-xs text-muted-foreground mt-4">
-        Supports: Amex UK, Barclays, HSBC, Monzo, Starling, and generic CSV formats
-      </p>
+    <div className="space-y-4">
+      {/* Bank selector - required first */}
+      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <label className="block text-sm font-medium mb-2">
+          Bank Format <span className="text-red-500">*</span>
+        </label>
+        <Select value={selectedBank || 'auto'} onValueChange={onBankChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select bank format" />
+          </SelectTrigger>
+          <SelectContent>
+            {bankOptions.map(option => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground mt-2">
+          Select your bank to ensure correct transaction parsing. Use "Auto-detect" if unsure.
+        </p>
+      </div>
 
-      {detectedBank && onBankChange && (
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-xs text-muted-foreground mb-2">
-            Detected format: <span className="font-semibold">{getBankDisplayName(detectedBank)}</span>
-          </p>
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium">Bank Format:</label>
-            <Select value={selectedBank || detectedBank} onValueChange={onBankChange}>
-              <SelectTrigger className="w-[200px] h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {bankOptions.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
+      {/* File upload area - always enabled now */}
+      <div
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
+      >
+        <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <p className="text-sm text-muted-foreground mb-4">
+          {isProcessing ? 'Processing...' : 'Drag & drop CSV file here, or click to browse'}
+        </p>
+        <input
+          type="file"
+          accept=".csv"
+          onChange={handleFileSelect}
+          className="hidden"
+          id="csv-upload"
+          disabled={isProcessing}
+        />
+        <label htmlFor="csv-upload">
+          <Button variant="outline" disabled={isProcessing} type="button" onClick={(e) => {
+            if (!isProcessing) {
+              document.getElementById('csv-upload')?.click();
+            }
+            e.preventDefault();
+          }}>
+            Choose File
+          </Button>
+        </label>
+        <p className="text-xs text-muted-foreground mt-4">
+          Supports: Amex UK, Barclays, HSBC, Monzo, Starling, and generic CSV formats
+        </p>
+      </div>
     </div>
   );
 };
