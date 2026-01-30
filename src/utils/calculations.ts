@@ -138,3 +138,59 @@ export function validateIncomeAmounts(
     expectedNet
   };
 }
+
+// Helper functions for managing imported vs manual expense amounts
+
+/**
+ * Normalize expense to ensure backward compatibility
+ * Old expenses only have actualAmount, new ones have importedAmount + manualAmount
+ */
+export function normalizeExpense(expense: any) {
+  // If already has the new structure, return as-is
+  if (expense.importedAmount !== undefined || expense.manualAmount !== undefined) {
+    return {
+      ...expense,
+      importedAmount: expense.importedAmount || 0,
+      manualAmount: expense.manualAmount || 0,
+      linkedTransactionIds: expense.linkedTransactionIds || []
+    };
+  }
+
+  // Old format: treat existing actualAmount as manual entry
+  return {
+    ...expense,
+    importedAmount: 0,
+    manualAmount: expense.actualAmount || 0,
+    linkedTransactionIds: []
+  };
+}
+
+/**
+ * Calculate the minimum allowed amount for an expense (imported amount)
+ */
+export function getMinimumExpenseAmount(expense: any): number {
+  return expense.importedAmount || 0;
+}
+
+/**
+ * Update expense with new manual amount, enforcing minimum
+ */
+export function updateExpenseAmount(
+  expense: any,
+  newActualAmount: number
+): any {
+  const normalized = normalizeExpense(expense);
+  const minimum = normalized.importedAmount;
+
+  // Enforce minimum: actualAmount cannot be less than importedAmount
+  const safeAmount = Math.max(newActualAmount, minimum);
+  const newManualAmount = safeAmount - minimum;
+
+  return {
+    ...expense,
+    actualAmount: safeAmount,
+    importedAmount: minimum,
+    manualAmount: newManualAmount,
+    linkedTransactionIds: normalized.linkedTransactionIds
+  };
+}

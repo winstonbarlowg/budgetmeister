@@ -114,6 +114,29 @@ export class FileSystemManager {
         data.moneyMovements = [];
       }
 
+      // Backwards compatibility: migrate old expense format to new structure
+      if (data.expenses) {
+        data.expenses = data.expenses.map((expense: any) => {
+          // If already has new structure, return as-is
+          if (expense.importedAmount !== undefined || expense.manualAmount !== undefined) {
+            return {
+              ...expense,
+              importedAmount: expense.importedAmount || 0,
+              manualAmount: expense.manualAmount || 0,
+              linkedTransactionIds: expense.linkedTransactionIds || []
+            };
+          }
+
+          // Old format: treat existing actualAmount as manual entry
+          return {
+            ...expense,
+            importedAmount: 0,
+            manualAmount: expense.actualAmount || 0,
+            linkedTransactionIds: []
+          };
+        });
+      }
+
       return data;
     } catch {
       // Return empty month data if file doesn't exist

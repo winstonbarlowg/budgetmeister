@@ -6,6 +6,7 @@ interface CurrencyInputProps {
   onChange: (value: number) => void;
   className?: string;
   id?: string;
+  min?: number;
 }
 
 export const CurrencyInput: React.FC<CurrencyInputProps> = ({
@@ -13,6 +14,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
   onChange,
   className = '',
   id,
+  min = 0,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -35,9 +37,10 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
     // Parse the input value and update
     const numValue = parseFloat(inputValue);
     if (!isNaN(numValue) && numValue !== value) {
-      onChange(numValue);
-    } else if (inputValue === '' && value !== 0) {
-      onChange(0);
+      // Enforce minimum value
+      onChange(Math.max(numValue, min));
+    } else if (inputValue === '' && value !== min) {
+      onChange(min);
     }
   };
 
@@ -64,7 +67,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         step="0.01"
-        min="0"
+        min={min}
         className={`${className} px-3 py-2 border rounded-md text-right`}
         placeholder="0.00"
       />

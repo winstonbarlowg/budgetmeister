@@ -311,32 +311,60 @@ function App() {
                 setConfig(updatedConfig);
               }}
               onApplyToMonth={async (transactions: CategorizedTransaction[], year: number, month: number) => {
-                // Group transactions by category
-                const expenseMap = new Map<string, number>();
+                // Group transactions by category and collect transaction IDs
+                const transactionMap = new Map<string, { amount: number; ids: string[] }>();
 
                 transactions
                   .filter(t => t.finalCategoryId && t.type === 'debit')
                   .forEach(t => {
-                    const current = expenseMap.get(t.finalCategoryId!) || 0;
-                    expenseMap.set(t.finalCategoryId!, current + t.amount);
+                    const existing = transactionMap.get(t.finalCategoryId!) || { amount: 0, ids: [] };
+                    existing.amount += t.amount;
+                    existing.ids.push(t.id);
+                    transactionMap.set(t.finalCategoryId!, existing);
                   });
 
                 // Load target month data
                 const targetMonthData = await fileSystemManager.loadMonthData(year, month);
 
-                // Update expenses
+                // Update expenses with new import tracking structure
                 const updatedExpenses = targetMonthData.expenses.map(expense => {
-                  const importedAmount = expenseMap.get(expense.categoryId) || 0;
+                  const imported = transactionMap.get(expense.categoryId);
+
+                  if (imported) {
+                    // Set imported amount and link transaction IDs
+                    const newImportedAmount = imported.amount;
+                    const newActualAmount = Math.max(expense.actualAmount || 0, newImportedAmount);
+                    const newManualAmount = newActualAmount - newImportedAmount;
+
+                    return {
+                      categoryId: expense.categoryId,
+                      actualAmount: newActualAmount,
+                      importedAmount: newImportedAmount,
+                      manualAmount: newManualAmount,
+                      linkedTransactionIds: imported.ids
+                    };
+                  }
+
+                  // No imports for this category - preserve existing structure
                   return {
-                    ...expense,
-                    actualAmount: expense.actualAmount + importedAmount
+                    categoryId: expense.categoryId,
+                    actualAmount: expense.actualAmount || 0,
+                    importedAmount: expense.importedAmount || 0,
+                    manualAmount: expense.manualAmount || 0,
+                    linkedTransactionIds: expense.linkedTransactionIds || []
                   };
                 });
 
                 // Add new categories if needed
-                expenseMap.forEach((amount, categoryId) => {
+                transactionMap.forEach((imported, categoryId) => {
                   if (!updatedExpenses.find(e => e.categoryId === categoryId)) {
-                    updatedExpenses.push({ categoryId, actualAmount: amount });
+                    updatedExpenses.push({
+                      categoryId,
+                      actualAmount: imported.amount,
+                      importedAmount: imported.amount,
+                      manualAmount: 0,
+                      linkedTransactionIds: imported.ids
+                    });
                   }
                 });
 

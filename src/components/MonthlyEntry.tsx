@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Save, TrendingDown, TrendingUp, DollarSign, RefreshCw } from 'lucide-react';
-import { MonthData, Category, MonthSummary, BudgetConfig, IncomeSource } from '../types';
-import { calculateMonthSummary, formatCurrency, getMonthName } from '../utils/calculations';
+import { MonthData, Category, MonthSummary, BudgetConfig, IncomeSource, MonthlyExpense } from '../types';
+import { calculateMonthSummary, formatCurrency, getMonthName, normalizeExpense, updateExpenseAmount, getMinimumExpenseAmount } from '../utils/calculations';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
@@ -28,19 +28,37 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   onMonthChange,
 }) => {
   const [expenses, setExpenses] = useState<{ [categoryId: string]: number }>({});
+  const [expenseDetails, setExpenseDetails] = useState<{ [categoryId: string]: MonthlyExpense }>({});
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
     const expenseMap: { [categoryId: string]: number } = {};
+    const detailsMap: { [categoryId: string]: MonthlyExpense } = {};
+
     monthData.expenses.forEach((expense) => {
-      expenseMap[expense.categoryId] = expense.actualAmount;
+      const normalized = normalizeExpense(expense);
+      expenseMap[expense.categoryId] = normalized.actualAmount;
+      detailsMap[expense.categoryId] = normalized;
     });
+
     setExpenses(expenseMap);
+    setExpenseDetails(detailsMap);
     setHasChanges(false);
   }, [monthData]);
 
   const handleExpenseChange = (categoryId: string, amount: number) => {
-    setExpenses({ ...expenses, [categoryId]: amount });
+    const currentDetail = expenseDetails[categoryId] || {
+      categoryId,
+      actualAmount: 0,
+      importedAmount: 0,
+      manualAmount: 0,
+      linkedTransactionIds: []
+    };
+
+    const minimum = getMinimumExpenseAmount(currentDetail);
+    const safeAmount = Math.max(amount, minimum);
+
+    setExpenses({ ...expenses, [categoryId]: safeAmount });
     setHasChanges(true);
   };
 
@@ -56,10 +74,18 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   };
 
   const handleSave = () => {
-    const updatedExpenses = categories.map((category) => ({
-      categoryId: category.id,
-      actualAmount: expenses[category.id] || 0,
-    }));
+    const updatedExpenses = categories.map((category) => {
+      const currentDetail = expenseDetails[category.id] || {
+        categoryId: category.id,
+        actualAmount: 0,
+        importedAmount: 0,
+        manualAmount: 0,
+        linkedTransactionIds: []
+      };
+
+      const newActualAmount = expenses[category.id] || 0;
+      return updateExpenseAmount(currentDetail, newActualAmount);
+    });
 
     onSave({
       ...monthData,
@@ -97,7 +123,17 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
     {
       year: monthData.year,
       month: monthData.month,
-      expenses: categories.map(c => ({ categoryId: c.id, actualAmount: expenses[c.id] || 0 })),
+      expenses: categories.map(c => {
+        const currentDetail = expenseDetails[c.id] || {
+          categoryId: c.id,
+          actualAmount: 0,
+          importedAmount: 0,
+          manualAmount: 0,
+          linkedTransactionIds: []
+        };
+        const newActualAmount = expenses[c.id] || 0;
+        return updateExpenseAmount(currentDetail, newActualAmount);
+      }),
       income: monthData.income || [],
       moneyMovements: monthData.moneyMovements || []
     }
@@ -266,32 +302,44 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {fixedCategories.map((category) => (
-              <div key={category.id}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="h-10 w-1 rounded-full"
-                      style={{ backgroundColor: category.color }}
-                    />
-                    <div>
-                      <Label htmlFor={category.id} className="text-base font-semibold">
-                        {category.name}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Budget: {formatCurrency(category.budgetAmount)}
-                      </p>
+            {fixedCategories.map((category) => {
+              const detail = expenseDetails[category.id];
+              const hasImports = detail && (detail.importedAmount || 0) > 0;
+              const minimum = detail ? getMinimumExpenseAmount(detail) : 0;
+
+              return (
+                <div key={category.id}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-10 w-1 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <div>
+                        <Label htmlFor={category.id} className="text-base font-semibold">
+                          {category.name}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Budget: {formatCurrency(category.budgetAmount)}
+                          {hasImports && (
+                            <span className="ml-2 text-xs text-blue-600 font-medium">
+                              • {formatCurrency(detail.importedAmount || 0)} imported
+                            </span>
+                          )}
+                        </p>
+                      </div>
                     </div>
+                    <CurrencyInput
+                      id={category.id}
+                      value={expenses[category.id] || 0}
+                      onChange={(value) => handleExpenseChange(category.id, value)}
+                      className="w-32"
+                      min={minimum}
+                    />
                   </div>
-                  <CurrencyInput
-                    id={category.id}
-                    value={expenses[category.id] || 0}
-                    onChange={(value) => handleExpenseChange(category.id, value)}
-                    className="w-32"
-                  />
                 </div>
-              </div>
-            ))}
+              );
+            })}
             <div className="pt-4 border-t">
               <div className="flex items-center justify-between text-lg font-semibold">
                 <span>Fixed Total</span>
@@ -312,30 +360,41 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {variableCategories.map((category) => (
-              <div key={category.id} className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="h-10 w-1 rounded-full"
-                      style={{ backgroundColor: category.color }}
-                    />
-                    <div>
-                      <Label htmlFor={category.id} className="text-base font-semibold">
-                        {category.name}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Budget: {formatCurrency(category.budgetAmount)}
-                      </p>
+            {variableCategories.map((category) => {
+              const detail = expenseDetails[category.id];
+              const hasImports = detail && (detail.importedAmount || 0) > 0;
+              const minimum = detail ? getMinimumExpenseAmount(detail) : 0;
+
+              return (
+                <div key={category.id} className="space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="h-10 w-1 rounded-full"
+                        style={{ backgroundColor: category.color }}
+                      />
+                      <div>
+                        <Label htmlFor={category.id} className="text-base font-semibold">
+                          {category.name}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Budget: {formatCurrency(category.budgetAmount)}
+                          {hasImports && (
+                            <span className="ml-2 text-xs text-blue-600 font-medium">
+                              • {formatCurrency(detail.importedAmount || 0)} imported
+                            </span>
+                          )}
+                        </p>
+                      </div>
                     </div>
+                    <CurrencyInput
+                      id={category.id}
+                      value={expenses[category.id] || 0}
+                      onChange={(value) => handleExpenseChange(category.id, value)}
+                      className="w-32"
+                      min={minimum}
+                    />
                   </div>
-                  <CurrencyInput
-                    id={category.id}
-                    value={expenses[category.id] || 0}
-                    onChange={(value) => handleExpenseChange(category.id, value)}
-                    className="w-32"
-                  />
-                </div>
                 <Progress
                   value={category.actualAmount}
                   max={category.budgetAmount}

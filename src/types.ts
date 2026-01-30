@@ -8,7 +8,10 @@ export interface Category {
 
 export interface MonthlyExpense {
   categoryId: string;
-  actualAmount: number;
+  actualAmount: number;              // Total amount (importedAmount + manualAmount)
+  importedAmount?: number;            // Amount from CSV imports (minimum floor)
+  manualAmount?: number;              // Additional manual adjustments on top of imports
+  linkedTransactionIds?: string[];    // Transaction IDs that contribute to importedAmount
 }
 
 export interface IncomeSource {
