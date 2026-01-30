@@ -5,9 +5,11 @@ import { Button } from './ui/button';
 import { TransactionUpload } from './TransactionUpload';
 import { TransactionSummary } from './TransactionSummary';
 import { TransactionReviewTable } from './TransactionReviewTable';
+import { FileStatementSummary } from './FileStatementSummary';
 import { parseBankCSV } from '../utils/csvParser';
 import { categorizeTransactions, learnFromCorrection } from '../utils/categorization';
 import { fileSystemManager } from '../utils/fileSystem';
+import { detectDuplicates } from '../utils/duplicateDetection';
 
 interface BankTransactionsProps {
   config: BudgetConfig;
@@ -30,6 +32,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low' | 'uncategorized'>('all');
   const [bankSource, setBankSource] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
+  const [ignoreDuplicates, setIgnoreDuplicates] = useState(false);
 
   const handleFileUpload = async (file: File) => {
     setIsProcessing(true);
@@ -48,8 +51,18 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
         transactionConfig.rules
       );
 
-      // 3. Set state
-      setImportedTransactions(categorized);
+      // 3. Detect duplicates within same import
+      const duplicates = detectDuplicates(categorized);
+
+      // 4. Mark transactions as duplicates
+      const withDuplicateFlags = categorized.map(t => ({
+        ...t,
+        isDuplicate: duplicates.get(t.id)?.isDuplicate || false,
+        duplicateSource: duplicates.get(t.id)?.duplicateSource?.categoryId
+      }));
+
+      // 5. Set state
+      setImportedTransactions(withDuplicateFlags);
       setImportSessionId(Date.now().toString());
 
       // Auto-filter to uncategorized if there are any
@@ -90,12 +103,34 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
     }
   };
 
+  const handleCancelImport = () => {
+    // Confirmation dialog
+    if (importedTransactions.length > 0) {
+      if (!confirm('Are you sure you want to cancel this import? All categorizations will be lost.')) {
+        return;
+      }
+    }
+
+    // Reset state
+    setImportedTransactions([]);
+    setImportSessionId(null);
+    setFileName('');
+    setBankSource(null);
+    setFilter('all');
+    setIgnoreDuplicates(false);
+  };
+
   const handleApplyToMonth = async () => {
     if (!importSessionId) return;
 
     try {
+      // Filter out duplicates if ignore flag is set
+      const transactionsToApply = ignoreDuplicates
+        ? importedTransactions.filter(t => !t.isDuplicate)
+        : importedTransactions;
+
       // Apply to current month
-      await onApplyToMonth(importedTransactions, currentYear, currentMonth);
+      await onApplyToMonth(transactionsToApply, currentYear, currentMonth);
 
       // Save import session
       const categorizedCount = importedTransactions.filter(
@@ -126,6 +161,8 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   const allReviewed = importedTransactions.length > 0 &&
     importedTransactions.every(t => t.suggestedCategoryId || t.finalCategoryId);
 
+  const hasDuplicates = importedTransactions.some(t => t.isDuplicate);
+
   return (
     <div className="space-y-6">
       {/* Upload section */}
@@ -147,6 +184,13 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
       {/* Review section (shown after upload) */}
       {importedTransactions.length > 0 && (
         <>
+          <FileStatementSummary
+            fileName={fileName}
+            bankSource={bankSource}
+            transactions={importedTransactions}
+            onCancel={handleCancelImport}
+          />
+
           <TransactionSummary transactions={importedTransactions} />
 
           <TransactionReviewTable
@@ -156,6 +200,24 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
             onFilterChange={(newFilter) => setFilter(newFilter as 'all' | 'high' | 'medium' | 'low' | 'uncategorized')}
             onCategoryChange={handleCategoryChange}
           />
+
+          {hasDuplicates && (
+            <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+              <input
+                type="checkbox"
+                id="ignore-duplicates"
+                checked={ignoreDuplicates}
+                onChange={(e) => setIgnoreDuplicates(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+              />
+              <label htmlFor="ignore-duplicates" className="text-sm font-medium cursor-pointer flex-1">
+                Ignore duplicate transactions when applying to monthly expenses
+              </label>
+              <span className="text-xs text-muted-foreground">
+                {importedTransactions.filter(t => t.isDuplicate).length} duplicates will be excluded
+              </span>
+            </div>
+          )}
 
           <Card>
             <CardContent className="pt-6">

@@ -120,6 +120,8 @@ export interface CategorizedTransaction extends RawTransaction {
   merchantPattern?: string;
   isReviewed: boolean;
   isApplied: boolean;
+  isDuplicate?: boolean;          // Flagged as duplicate within same import
+  duplicateSource?: string;       // Where duplicate was found (e.g., 'same-import')
 }
 
 export interface CategorizationRule {

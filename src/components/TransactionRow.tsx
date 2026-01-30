@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, AlertTriangle, Copy } from 'lucide-react';
 import { CategorizedTransaction, Category } from '../types';
 import { Badge } from './ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -40,6 +40,13 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
+        {transaction.isDuplicate && (
+          <Badge variant="destructive" className="gap-1">
+            <Copy className="h-3 w-3" />
+            Duplicate
+          </Badge>
+        )}
+
         {transaction.confidence && (
           <Badge variant="outline">
             {Math.round(transaction.confidence * 100)}%

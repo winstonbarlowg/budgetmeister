@@ -13,11 +13,14 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
     mediumConfidence: transactions.filter(t => (t.confidence || 0) > 0.5 && (t.confidence || 0) <= 0.8).length,
     lowConfidence: transactions.filter(t => (t.confidence || 0) > 0 && (t.confidence || 0) <= 0.5).length,
     uncategorized: transactions.filter(t => !t.suggestedCategoryId).length,
-    totalAmount: transactions.reduce((sum, t) => sum + (t.type === 'debit' ? t.amount : 0), 0)
+    totalAmount: transactions.reduce((sum, t) => sum + (t.type === 'debit' ? t.amount : 0), 0),
+    duplicates: transactions.filter(t => t.isDuplicate).length
   };
 
+  const hasDuplicates = stats.duplicates > 0;
+
   return (
-    <div className="grid gap-4 md:grid-cols-4">
+    <div className={`grid gap-4 ${hasDuplicates ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>Total Transactions</CardDescription>
@@ -61,6 +64,18 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
           <p className="text-xs text-muted-foreground">Requires manual category</p>
         </CardContent>
       </Card>
+
+      {hasDuplicates && (
+        <Card className="border-orange-300 bg-orange-50">
+          <CardHeader className="pb-2">
+            <CardDescription>Duplicate Transactions</CardDescription>
+            <CardTitle className="text-3xl text-orange-600">{stats.duplicates}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-muted-foreground">Found in same import</p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

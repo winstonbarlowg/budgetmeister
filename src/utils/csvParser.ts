@@ -75,6 +75,19 @@ export function detectBankFormat(csvContent: string): string | null {
   return null;
 }
 
+// Get friendly bank display name
+export function getBankDisplayName(bankSource: string | null): string {
+  const names: Record<string, string> = {
+    'amex-uk': 'American Express UK',
+    'barclays': 'Barclays',
+    'hsbc': 'HSBC',
+    'monzo': 'Monzo',
+    'starling': 'Starling Bank',
+    'generic': 'Generic CSV'
+  };
+  return names[bankSource || 'generic'] || 'Unknown Bank';
+}
+
 // Parse UK date formats (DD/MM/YYYY)
 function parseUKDate(dateStr: string): Date {
   const parts = dateStr.split('/');
