@@ -10,7 +10,6 @@ import { calculateMonthSummary } from './utils/calculations';
 import { BudgetConfig, MonthData, MonthSummary, CategorizedTransaction } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -201,63 +200,108 @@ function App() {
   }
 
   const currentMonthSummary = calculateMonthSummary(config, monthData);
+  const [activeTab, setActiveTab] = useState('monthly');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
-      <div className="container mx-auto p-4 md:p-8 space-y-8">
+    <div className="flex min-h-screen bg-gradient-to-br from-background via-background to-muted">
+      {/* Fixed Left Sidebar Navigation */}
+      <aside className="fixed left-0 top-0 h-screen w-64 border-r bg-card shadow-lg flex flex-col">
         {/* Header */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <TrendingUp className="h-6 w-6" />
+        <div className="p-6 border-b">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <TrendingUp className="h-5 w-5" />
             </div>
-            Budget Tracker
-          </h1>
-          <p className="text-muted-foreground text-lg">Managing your finances together</p>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Budget Tracker</h1>
+              <p className="text-xs text-muted-foreground">Managing finances</p>
+            </div>
+          </div>
         </div>
 
-        {/* Main Content with Tabs */}
-        <Tabs defaultValue="monthly" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="monthly" className="gap-2">
-              <Calendar className="h-4 w-4" />
-              <span className="hidden sm:inline">Monthly Entry</span>
-              <span className="sm:hidden">Monthly</span>
-            </TabsTrigger>
-            <TabsTrigger value="bank-transactions" className="gap-2">
-              <Upload className="h-4 w-4" />
-              <span className="hidden sm:inline">Bank Transactions</span>
-              <span className="sm:hidden">Bank</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="gap-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Analytics</span>
-              <span className="sm:hidden">Charts</span>
-            </TabsTrigger>
-            <TabsTrigger value="yearly" className="gap-2">
-              <Calendar className="h-4 w-4" />
-              <span className="hidden sm:inline">Yearly Overview</span>
-              <span className="sm:hidden">Yearly</span>
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
-              <Settings className="h-4 w-4" />
-              <span className="hidden sm:inline">Settings</span>
-              <span className="sm:hidden">Settings</span>
-            </TabsTrigger>
-          </TabsList>
+        {/* Navigation */}
+        <nav className="flex-1 p-4 space-y-2">
+          <button
+            onClick={() => setActiveTab('monthly')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'monthly'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <Calendar className="h-5 w-5" />
+            <span>Monthly Entry</span>
+          </button>
 
-          <TabsContent value="monthly" className="space-y-4">
-            <MonthlyEntry
-              categories={config.categories}
-              incomeSources={config.incomeSources}
-              config={config}
-              monthData={monthData}
-              onSave={handleSaveMonthData}
-              onMonthChange={handleMonthChange}
-            />
-          </TabsContent>
+          <button
+            onClick={() => setActiveTab('bank-transactions')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'bank-transactions'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <Upload className="h-5 w-5" />
+            <span>Bank Transactions</span>
+          </button>
 
-          <TabsContent value="bank-transactions" className="space-y-4">
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'analytics'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <BarChart3 className="h-5 w-5" />
+            <span>Analytics</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('yearly')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'yearly'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <Calendar className="h-5 w-5" />
+            <span>Yearly Overview</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'settings'
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <Settings className="h-5 w-5" />
+            <span>Settings</span>
+          </button>
+        </nav>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="ml-64 flex-1 p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+
+          {activeTab === 'monthly' && (
+            <div className="space-y-4">
+              <MonthlyEntry
+                categories={config.categories}
+                incomeSources={config.incomeSources}
+                config={config}
+                monthData={monthData}
+                onSave={handleSaveMonthData}
+                onMonthChange={handleMonthChange}
+              />
+            </div>
+          )}
+
+          {activeTab === 'bank-transactions' && (
+            <div className="space-y-4">
             <BankTransactions
               config={config}
               currentYear={currentYear}
@@ -307,38 +351,45 @@ function App() {
                 }
               }}
             />
-          </TabsContent>
+            </div>
+          )}
 
-          <TabsContent value="analytics" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl">Analytics & Insights</CardTitle>
-                <CardDescription>
-                  Visual insights into your spending patterns and budget performance
-                </CardDescription>
-              </CardHeader>
-            </Card>
-            <Visualizations
-              currentMonth={currentMonthSummary}
-              yearData={yearData}
-              onYearChange={handleYearChange}
-            />
-          </TabsContent>
+          {activeTab === 'analytics' && (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-2xl">Analytics & Insights</CardTitle>
+                  <CardDescription>
+                    Visual insights into your spending patterns and budget performance
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+              <Visualizations
+                currentMonth={currentMonthSummary}
+                yearData={yearData}
+                onYearChange={handleYearChange}
+              />
+            </div>
+          )}
 
-          <TabsContent value="yearly" className="space-y-4">
-            <YearlyDashboard year={currentYear} yearData={yearData} />
-          </TabsContent>
+          {activeTab === 'yearly' && (
+            <div className="space-y-4">
+              <YearlyDashboard year={currentYear} yearData={yearData} />
+            </div>
+          )}
 
-          <TabsContent value="settings" className="space-y-4">
-            <SettingsManager
-              categories={config.categories}
-              incomeSources={config.incomeSources}
-              onSaveCategories={(categories) => handleSaveConfig({ ...config, categories })}
-              onSaveIncomeSources={(incomeSources) => handleSaveConfig({ ...config, incomeSources })}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
+          {activeTab === 'settings' && (
+            <div className="space-y-4">
+              <SettingsManager
+                categories={config.categories}
+                incomeSources={config.incomeSources}
+                onSaveCategories={(categories) => handleSaveConfig({ ...config, categories })}
+                onSaveIncomeSources={(incomeSources) => handleSaveConfig({ ...config, incomeSources })}
+              />
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
