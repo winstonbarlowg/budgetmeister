@@ -60,6 +60,7 @@ export interface MonthData {
 export interface BudgetConfig {
   categories: Category[];
   incomeSources: IncomeSource[];
+  transactionConfig?: TransactionConfig;
   lastModified: string;
 }
 
@@ -93,4 +94,56 @@ export interface MonthSummary {
   totalInvestments: number;
   totalMoneyMovements: number;
   netDisposableIncome: number;
+}
+
+// Bank transaction types
+export interface RawTransaction {
+  id: string;
+  date: Date;
+  description: string;
+  rawDescription: string;
+  amount: number;
+  type: 'debit' | 'credit';
+  balance?: number;
+  source: 'csv-import';
+  importBatchId: string;
+  bankSource?: string;
+}
+
+export interface CategorizedTransaction extends RawTransaction {
+  suggestedCategoryId?: string;
+  confidence?: number;
+  finalCategoryId?: string;
+  merchantPattern?: string;
+  isReviewed: boolean;
+  isApplied: boolean;
+}
+
+export interface CategorizationRule {
+  id: string;
+  pattern: string;
+  categoryId: string;
+  confidence: number;
+  source: 'user' | 'system' | 'learned';
+  frequency: number;
+  lastUsed: string;
+  createdAt: string;
+}
+
+export interface ImportSession {
+  id: string;
+  fileName: string;
+  importDate: string;
+  bankSource?: string;
+  transactionCount: number;
+  categorizedCount: number;
+  appliedToMonth: boolean;
+  targetYear?: number;
+  targetMonth?: number;
+}
+
+export interface TransactionConfig {
+  rules: CategorizationRule[];
+  importSessions: ImportSession[];
+  lastModified: string;
 }

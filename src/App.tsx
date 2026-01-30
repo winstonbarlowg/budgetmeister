@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
-import { FolderOpen, Calendar, BarChart3, Settings, TrendingUp } from 'lucide-react';
+import { FolderOpen, Calendar, BarChart3, Settings, TrendingUp, Upload } from 'lucide-react';
 import { SettingsManager } from './components/SettingsManager';
 import { MonthlyEntry } from './components/MonthlyEntry';
 import { Visualizations } from './components/Visualizations';
 import { YearlyDashboard } from './components/YearlyDashboard';
+import { BankTransactions } from './components/BankTransactions';
 import { fileSystemManager } from './utils/fileSystem';
 import { calculateMonthSummary } from './utils/calculations';
-import { BudgetConfig, MonthData, MonthSummary } from './types';
+import { BudgetConfig, MonthData, MonthSummary, CategorizedTransaction } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
@@ -217,11 +218,16 @@ function App() {
 
         {/* Main Content with Tabs */}
         <Tabs defaultValue="monthly" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
             <TabsTrigger value="monthly" className="gap-2">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Monthly Entry</span>
               <span className="sm:hidden">Monthly</span>
+            </TabsTrigger>
+            <TabsTrigger value="bank-transactions" className="gap-2">
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Bank Transactions</span>
+              <span className="sm:hidden">Bank</span>
             </TabsTrigger>
             <TabsTrigger value="analytics" className="gap-2">
               <BarChart3 className="h-4 w-4" />
@@ -248,6 +254,58 @@ function App() {
               monthData={monthData}
               onSave={handleSaveMonthData}
               onMonthChange={handleMonthChange}
+            />
+          </TabsContent>
+
+          <TabsContent value="bank-transactions" className="space-y-4">
+            <BankTransactions
+              config={config}
+              currentYear={currentYear}
+              currentMonth={currentMonth}
+              onConfigUpdate={async (updatedConfig) => {
+                await fileSystemManager.saveConfig(updatedConfig);
+                setConfig(updatedConfig);
+              }}
+              onApplyToMonth={async (transactions: CategorizedTransaction[], year: number, month: number) => {
+                // Group transactions by category
+                const expenseMap = new Map<string, number>();
+
+                transactions
+                  .filter(t => t.finalCategoryId && t.type === 'debit')
+                  .forEach(t => {
+                    const current = expenseMap.get(t.finalCategoryId!) || 0;
+                    expenseMap.set(t.finalCategoryId!, current + t.amount);
+                  });
+
+                // Load target month data
+                const targetMonthData = await fileSystemManager.loadMonthData(year, month);
+
+                // Update expenses
+                const updatedExpenses = targetMonthData.expenses.map(expense => {
+                  const importedAmount = expenseMap.get(expense.categoryId) || 0;
+                  return {
+                    ...expense,
+                    actualAmount: expense.actualAmount + importedAmount
+                  };
+                });
+
+                // Add new categories if needed
+                expenseMap.forEach((amount, categoryId) => {
+                  if (!updatedExpenses.find(e => e.categoryId === categoryId)) {
+                    updatedExpenses.push({ categoryId, actualAmount: amount });
+                  }
+                });
+
+                // Save updated month data
+                const updatedMonthData = { ...targetMonthData, expenses: updatedExpenses };
+                await fileSystemManager.saveMonthData(updatedMonthData);
+
+                // Refresh UI if current month
+                if (year === currentYear && month === currentMonth) {
+                  setMonthData(updatedMonthData);
+                  await loadYearData();
+                }
+              }}
             />
           </TabsContent>
 

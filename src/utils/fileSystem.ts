@@ -1,4 +1,4 @@
-import { BudgetConfig, MonthData, YearlyData } from '../types';
+import { BudgetConfig, MonthData, YearlyData, TransactionConfig, CategorizationRule, ImportSession } from '../types';
 
 const DEFAULT_CATEGORIES: BudgetConfig = {
   categories: [
@@ -52,6 +52,15 @@ export class FileSystemManager {
       // Backwards compatibility: add incomeSources if missing
       if (!config.incomeSources) {
         config.incomeSources = [];
+      }
+
+      // Backwards compatibility: add transactionConfig if missing
+      if (!config.transactionConfig) {
+        config.transactionConfig = {
+          rules: [],
+          importSessions: [],
+          lastModified: new Date().toISOString()
+        };
       }
 
       return config;
@@ -166,6 +175,52 @@ export class FileSystemManager {
 
   isInitialized(): boolean {
     return this.budgetDataHandle !== null;
+  }
+
+  async loadTransactionConfig(): Promise<TransactionConfig> {
+    const config = await this.loadConfig();
+    if (!config.transactionConfig) {
+      return {
+        rules: [],
+        importSessions: [],
+        lastModified: new Date().toISOString()
+      };
+    }
+    return config.transactionConfig;
+  }
+
+  async saveTransactionConfig(transactionConfig: TransactionConfig): Promise<void> {
+    const config = await this.loadConfig();
+    config.transactionConfig = {
+      ...transactionConfig,
+      lastModified: new Date().toISOString()
+    };
+    await this.saveConfig(config);
+  }
+
+  async addCategorizationRule(rule: CategorizationRule): Promise<void> {
+    const transactionConfig = await this.loadTransactionConfig();
+
+    // Check if rule with same pattern and category already exists
+    const existingIndex = transactionConfig.rules.findIndex(
+      r => r.pattern === rule.pattern && r.categoryId === rule.categoryId
+    );
+
+    if (existingIndex !== -1) {
+      // Update existing rule
+      transactionConfig.rules[existingIndex] = rule;
+    } else {
+      // Add new rule
+      transactionConfig.rules.push(rule);
+    }
+
+    await this.saveTransactionConfig(transactionConfig);
+  }
+
+  async saveImportSession(session: ImportSession): Promise<void> {
+    const transactionConfig = await this.loadTransactionConfig();
+    transactionConfig.importSessions.push(session);
+    await this.saveTransactionConfig(transactionConfig);
   }
 }
 
