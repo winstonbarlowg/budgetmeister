@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { BudgetConfig, CategorizedTransaction } from '../types';
+import { useState, useEffect } from 'react';
+import { BudgetConfig, CategorizedTransaction, ImportSession } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { TransactionUpload } from './TransactionUpload';
 import { TransactionSummary } from './TransactionSummary';
 import { TransactionReviewTable } from './TransactionReviewTable';
 import { FileStatementSummary } from './FileStatementSummary';
+import { ImportHistoryItem } from './ImportHistoryItem';
 import { parseBankCSV } from '../utils/csvParser';
 import { categorizeTransactions, learnFromCorrection } from '../utils/categorization';
 import { fileSystemManager } from '../utils/fileSystem';
@@ -17,6 +18,7 @@ interface BankTransactionsProps {
   currentMonth: number;
   onConfigUpdate: (config: BudgetConfig) => Promise<void>;
   onApplyToMonth: (transactions: CategorizedTransaction[], year: number, month: number) => Promise<void>;
+  onDataChange?: () => Promise<void>;
 }
 
 export const BankTransactions: React.FC<BankTransactionsProps> = ({
@@ -24,7 +26,8 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   currentYear,
   currentMonth,
   onConfigUpdate: _onConfigUpdate,
-  onApplyToMonth
+  onApplyToMonth,
+  onDataChange
 }) => {
   const [importedTransactions, setImportedTransactions] = useState<CategorizedTransaction[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -33,6 +36,55 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   const [bankSource, setBankSource] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
   const [ignoreDuplicates, setIgnoreDuplicates] = useState(false);
+  const [importHistory, setImportHistory] = useState<ImportSession[]>([]);
+  const [removingSessionId, setRemovingSessionId] = useState<string | null>(null);
+
+  // Load import history on mount and when import is applied
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const transactionConfig = await fileSystemManager.loadTransactionConfig();
+        // Sort by import date, most recent first
+        const sorted = [...transactionConfig.importSessions].sort((a, b) =>
+          new Date(b.importDate).getTime() - new Date(a.importDate).getTime()
+        );
+        setImportHistory(sorted);
+      } catch (error) {
+        console.error('Failed to load import history:', error);
+      }
+    };
+    loadHistory();
+  }, [importedTransactions]);
+
+  const handleRemoveImport = async (sessionId: string) => {
+    if (!confirm('Are you sure you want to remove this import? All transactions from this import will be removed from the monthly expenses.')) {
+      return;
+    }
+
+    setRemovingSessionId(sessionId);
+
+    try {
+      const result = await fileSystemManager.removeImportSession(sessionId);
+
+      // Reload import history
+      const transactionConfig = await fileSystemManager.loadTransactionConfig();
+      const sorted = [...transactionConfig.importSessions].sort((a, b) =>
+        new Date(b.importDate).getTime() - new Date(a.importDate).getTime()
+      );
+      setImportHistory(sorted);
+
+      // Notify parent to refresh data if the removed import affected current/viewed month
+      if (result && onDataChange) {
+        await onDataChange();
+      }
+
+      alert('Import removed successfully');
+    } catch (error) {
+      alert(`Failed to remove import: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setRemovingSessionId(null);
+    }
+  };
 
   const handleFileUpload = async (file: File) => {
     setIsProcessing(true);
@@ -241,18 +293,29 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
         </>
       )}
 
-      {/* Import history (optional) */}
+      {/* Import history */}
       {!isProcessing && importedTransactions.length === 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Imports</CardTitle>
-            <CardDescription>View your import history</CardDescription>
+            <CardTitle>Import History</CardTitle>
+            <CardDescription>
+              {importHistory.length > 0
+                ? 'View and manage your previous imports'
+                : 'No import history yet. Upload a CSV file to get started.'}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No import history yet. Upload a CSV file to get started.
-            </p>
-          </CardContent>
+          {importHistory.length > 0 && (
+            <CardContent className="space-y-3">
+              {importHistory.map(session => (
+                <ImportHistoryItem
+                  key={session.id}
+                  session={session}
+                  onRemove={handleRemoveImport}
+                  isRemoving={removingSessionId === session.id}
+                />
+              ))}
+            </CardContent>
+          )}
         </Card>
       )}
     </div>

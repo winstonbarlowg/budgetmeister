@@ -378,6 +378,12 @@ function App() {
                   await loadYearData();
                 }
               }}
+              onDataChange={async () => {
+                // Reload current month data and year data after import removal
+                const updatedMonthData = await fileSystemManager.loadMonthData(currentYear, currentMonth);
+                setMonthData(updatedMonthData);
+                await loadYearData();
+              }}
             />
             </div>
           )}
