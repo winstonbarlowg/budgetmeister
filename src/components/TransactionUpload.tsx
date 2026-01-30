@@ -47,11 +47,16 @@ export const TransactionUpload: React.FC<TransactionUploadProps> = ({ onUpload, 
         id="csv-upload"
         disabled={isProcessing}
       />
-      <Button asChild variant="outline" disabled={isProcessing}>
-        <label htmlFor="csv-upload" className="cursor-pointer">
+      <label htmlFor="csv-upload">
+        <Button variant="outline" disabled={isProcessing} type="button" onClick={(e) => {
+          if (!isProcessing) {
+            document.getElementById('csv-upload')?.click();
+          }
+          e.preventDefault();
+        }}>
           Choose File
-        </label>
-      </Button>
+        </Button>
+      </label>
       <p className="text-xs text-muted-foreground mt-4">
         Supports: Amex UK, Barclays, HSBC, Monzo, Starling, and generic CSV formats
       </p>

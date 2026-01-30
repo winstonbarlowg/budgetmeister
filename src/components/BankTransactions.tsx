@@ -21,7 +21,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   config,
   currentYear,
   currentMonth,
-  onConfigUpdate,
+  onConfigUpdate: _onConfigUpdate,
   onApplyToMonth
 }) => {
   const [importedTransactions, setImportedTransactions] = useState<CategorizedTransaction[]>([]);
@@ -153,7 +153,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
             transactions={importedTransactions}
             categories={config.categories}
             filter={filter}
-            onFilterChange={setFilter}
+            onFilterChange={(newFilter) => setFilter(newFilter as 'all' | 'high' | 'medium' | 'low' | 'uncategorized')}
             onCategoryChange={handleCategoryChange}
           />
 

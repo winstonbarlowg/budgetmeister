@@ -395,23 +395,24 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                       min={minimum}
                     />
                   </div>
-                <Progress
-                  value={category.actualAmount}
-                  max={category.budgetAmount}
-                  variant={category.percentUsed > 100 ? 'destructive' : category.percentUsed > 90 ? 'warning' : 'success'}
-                />
-                {category.percentUsed > 0 && (
-                  <p className="text-xs text-muted-foreground text-right">
-                    {category.percentUsed.toFixed(1)}% used
-                    {category.variance !== 0 && (
-                      <span className={category.variance > 0 ? 'text-destructive ml-2' : 'text-success ml-2'}>
-                        ({category.variance > 0 ? '+' : ''}{formatCurrency(category.variance)})
-                      </span>
-                    )}
-                  </p>
-                )}
-              </div>
-            ))}
+                  <Progress
+                    value={category.actualAmount}
+                    max={category.budgetAmount}
+                    variant={category.percentUsed > 100 ? 'destructive' : category.percentUsed > 90 ? 'warning' : 'success'}
+                  />
+                  {category.percentUsed > 0 && (
+                    <p className="text-xs text-muted-foreground text-right">
+                      {category.percentUsed.toFixed(1)}% used
+                      {category.variance !== 0 && (
+                        <span className={category.variance > 0 ? 'text-destructive ml-2' : 'text-success ml-2'}>
+                          ({category.variance > 0 ? '+' : ''}{formatCurrency(category.variance)})
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
             <div className="pt-4 border-t">
               <div className="flex items-center justify-between text-lg font-semibold">
                 <span>Variable Total</span>
