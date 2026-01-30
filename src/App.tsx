@@ -19,6 +19,7 @@ function App() {
   const [monthData, setMonthData] = useState<MonthData | null>(null);
   const [yearData, setYearData] = useState<MonthSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('monthly');
 
   const handleOpenDirectory = async () => {
     setLoading(true);
@@ -200,7 +201,6 @@ function App() {
   }
 
   const currentMonthSummary = calculateMonthSummary(config, monthData);
-  const [activeTab, setActiveTab] = useState('monthly');
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-background via-background to-muted">
