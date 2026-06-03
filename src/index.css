@@ -34,6 +34,14 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
 
+    /* Info blue (investments, spent, informational) */
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* Highlight purple (disposable income, emphasis) */
+    --highlight: 271 76% 53%;
+    --highlight-foreground: 0 0% 100%;
+
     /* Destructive red */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
@@ -83,6 +91,12 @@
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
+
+    --info: 217 91% 65%;
+    --info-foreground: 0 0% 100%;
+
+    --highlight: 271 76% 63%;
+    --highlight-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;

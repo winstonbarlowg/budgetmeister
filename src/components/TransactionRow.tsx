@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { AlertCircle, CheckCircle2, AlertTriangle, Copy, CreditCard } from 'lucide-react';
 import { CategorizedTransaction, Category } from '../types';
 import { Badge } from './ui/badge';
+import { Checkbox } from './ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { formatCurrency } from '../utils/calculations';
 
@@ -19,27 +20,24 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
   onExcludeToggle
 }) => {
   const confidenceColor =
-    !transaction.confidence ? 'bg-red-100 border-red-300' :
-    transaction.confidence > 0.8 ? 'bg-green-100 border-green-300' :
-    transaction.confidence > 0.5 ? 'bg-yellow-100 border-yellow-300' :
-    'bg-orange-100 border-orange-300';
+    !transaction.confidence ? 'bg-destructive/10 border-destructive/30' :
+    transaction.confidence > 0.8 ? 'bg-success/10 border-success/30' :
+    'bg-warning/10 border-warning/30';
 
   const confidenceIcon =
-    !transaction.confidence ? <AlertCircle className="h-4 w-4 text-red-600" /> :
-    transaction.confidence > 0.8 ? <CheckCircle2 className="h-4 w-4 text-green-600" /> :
-    <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+    !transaction.confidence ? <AlertCircle className="h-4 w-4 text-destructive" /> :
+    transaction.confidence > 0.8 ? <CheckCircle2 className="h-4 w-4 text-success" /> :
+    <AlertTriangle className="h-4 w-4 text-warning" />;
 
   const isExcluded = transaction.isExcluded || false;
   const isRefund = transaction.transactionType === 'refund' || transaction.transactionType === 'payment';
 
   return (
-    <div className={`flex items-center justify-between p-3 rounded-lg border ${confidenceColor} ${isExcluded ? 'opacity-50 bg-gray-50' : ''}`}>
+    <div className={`flex items-center justify-between p-3 rounded-lg border ${confidenceColor} ${isExcluded ? 'opacity-50 bg-muted' : ''}`}>
       <div className="flex items-center gap-3 flex-1">
-        <input
-          type="checkbox"
+        <Checkbox
           checked={!isExcluded}
-          onChange={(e) => onExcludeToggle(transaction.id, !e.target.checked)}
-          className="h-4 w-4 rounded border-gray-300"
+          onCheckedChange={(checked) => onExcludeToggle(transaction.id, checked !== true)}
           title={isExcluded ? 'Click to include in expenses' : 'Click to exclude from expenses'}
         />
         {confidenceIcon}
@@ -53,7 +51,7 @@ export const TransactionRow: React.FC<TransactionRowProps> = ({
 
       <div className="flex items-center gap-3">
         {isRefund && (
-          <Badge variant="secondary" className="gap-1 bg-green-100 text-green-800 border-green-300">
+          <Badge variant="secondary" className="gap-1 bg-success/15 text-success border-success/30">
             <CreditCard className="h-3 w-3" />
             {transaction.transactionType === 'refund' ? 'Refund' : 'Payment'}
           </Badge>

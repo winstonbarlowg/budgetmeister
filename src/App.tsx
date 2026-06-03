@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FolderOpen, Calendar, BarChart3, Settings, TrendingUp, Upload } from 'lucide-react';
+import { FolderOpen, Calendar, BarChart3, Settings, TrendingUp, Upload, AlertTriangle } from 'lucide-react';
 import { SettingsManager } from './components/SettingsManager';
 import { MonthlyEntry } from './components/MonthlyEntry';
 import { Visualizations } from './components/Visualizations';
@@ -10,6 +10,8 @@ import { calculateMonthSummary } from './utils/calculations';
 import { BudgetConfig, MonthData, MonthSummary, CategorizedTransaction } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog';
+import { Toaster } from './components/ui/sonner';
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -20,6 +22,10 @@ function App() {
   const [yearData, setYearData] = useState<MonthSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('monthly');
+  const [monthlyHasChanges, setMonthlyHasChanges] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<
+    { type: 'tab'; tab: string } | { type: 'month'; year: number; month: number } | null
+  >(null);
 
   const handleOpenDirectory = async () => {
     setLoading(true);
@@ -107,6 +113,33 @@ function App() {
     } catch (err) {
       console.error('Failed to load year data:', err);
     }
+  };
+
+  const handleTabChange = (tab: string) => {
+    if (activeTab === 'monthly' && monthlyHasChanges) {
+      setPendingNavigation({ type: 'tab', tab });
+      return;
+    }
+    setActiveTab(tab);
+  };
+
+  const handleMonthChangeWithGuard = (year: number, month: number) => {
+    if (monthlyHasChanges) {
+      setPendingNavigation({ type: 'month', year, month });
+      return;
+    }
+    handleMonthChange(year, month);
+  };
+
+  const handleDiscardAndNavigate = () => {
+    if (!pendingNavigation) return;
+    setMonthlyHasChanges(false);
+    if (pendingNavigation.type === 'tab') {
+      setActiveTab(pendingNavigation.tab);
+    } else {
+      handleMonthChange(pendingNavigation.year, pendingNavigation.month);
+    }
+    setPendingNavigation(null);
   };
 
   useEffect(() => {
@@ -222,7 +255,7 @@ function App() {
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2">
           <button
-            onClick={() => setActiveTab('monthly')}
+            onClick={() => handleTabChange('monthly')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'monthly'
                 ? 'bg-primary text-primary-foreground shadow-sm'
@@ -234,7 +267,7 @@ function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('bank-transactions')}
+            onClick={() => handleTabChange('bank-transactions')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'bank-transactions'
                 ? 'bg-primary text-primary-foreground shadow-sm'
@@ -246,7 +279,7 @@ function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('analytics')}
+            onClick={() => handleTabChange('analytics')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'analytics'
                 ? 'bg-primary text-primary-foreground shadow-sm'
@@ -258,7 +291,7 @@ function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('yearly')}
+            onClick={() => handleTabChange('yearly')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'yearly'
                 ? 'bg-primary text-primary-foreground shadow-sm'
@@ -270,7 +303,7 @@ function App() {
           </button>
 
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => handleTabChange('settings')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'settings'
                 ? 'bg-primary text-primary-foreground shadow-sm'
@@ -295,7 +328,8 @@ function App() {
                 config={config}
                 monthData={monthData}
                 onSave={handleSaveMonthData}
-                onMonthChange={handleMonthChange}
+                onMonthChange={handleMonthChangeWithGuard}
+                onHasChangesChange={setMonthlyHasChanges}
               />
             </div>
           )}
@@ -424,6 +458,31 @@ function App() {
           )}
         </div>
       </main>
+
+      {/* Unsaved Changes Confirmation Dialog */}
+      <Dialog open={pendingNavigation !== null} onOpenChange={(open) => { if (!open) setPendingNavigation(null); }}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              Unsaved Changes
+            </DialogTitle>
+            <DialogDescription>
+              You have unsaved changes that will be lost if you leave this page.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setPendingNavigation(null)}>
+              Go Back
+            </Button>
+            <Button variant="destructive" onClick={handleDiscardAndNavigate}>
+              Discard & Leave
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Toaster richColors closeButton />
     </div>
   );
 }

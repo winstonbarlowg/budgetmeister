@@ -80,7 +80,7 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-emerald-600">
+            <CardTitle className="flex items-center gap-2 text-success">
               <TrendingDown className="h-5 w-5" /> Best Month
             </CardTitle>
           </CardHeader>
@@ -93,7 +93,7 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Under Budget</div>
-                  <div className="text-2xl font-bold text-emerald-600">
+                  <div className="text-2xl font-bold text-success">
                     {formatCurrency(Math.abs(bestMonth.totalVariance))}
                   </div>
                 </div>
@@ -112,7 +112,7 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
+            <CardTitle className="flex items-center gap-2 text-destructive">
               <TrendingUp className="h-5 w-5" /> Challenging Month
             </CardTitle>
           </CardHeader>
@@ -127,7 +127,7 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
                   <div className="text-sm text-muted-foreground mb-1">
                     {worstMonth.totalVariance > 0 ? 'Over Budget' : 'Under Budget'}
                   </div>
-                  <div className={`text-2xl font-bold ${worstMonth.totalVariance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                  <div className={`text-2xl font-bold ${worstMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
                     {formatCurrency(Math.abs(worstMonth.totalVariance))}
                   </div>
                 </div>

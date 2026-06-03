@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { BudgetConfig, CategorizedTransaction, ImportSession } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
+import { useConfirm } from './ui/confirm-dialog';
 import { TransactionUpload } from './TransactionUpload';
 import { TransactionSummary } from './TransactionSummary';
 import { TransactionReviewTable } from './TransactionReviewTable';
@@ -39,6 +42,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   const [importHistory, setImportHistory] = useState<ImportSession[]>([]);
   const [removingSessionId, setRemovingSessionId] = useState<string | null>(null);
   const [selectedBank, setSelectedBank] = useState<string>('auto');
+  const confirm = useConfirm();
 
   // Load import history on mount and when import is applied
   useEffect(() => {
@@ -58,7 +62,13 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   }, [importedTransactions]);
 
   const handleRemoveImport = async (sessionId: string) => {
-    if (!confirm('Are you sure you want to remove this import? All transactions from this import will be removed from the monthly expenses.')) {
+    const confirmed = await confirm({
+      title: 'Remove this import?',
+      description: 'All transactions from this import will be removed from the monthly expenses.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -79,9 +89,9 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
         await onDataChange();
       }
 
-      alert('Import removed successfully');
+      toast.success('Import removed successfully');
     } catch (error) {
-      alert(`Failed to remove import: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to remove import: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setRemovingSessionId(null);
     }
@@ -128,7 +138,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
         setFilter('all');
       }
     } catch (error) {
-      alert(`Failed to import CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to import CSV: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -169,10 +179,16 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
     setImportedTransactions(updatedTransactions);
   };
 
-  const handleCancelImport = () => {
+  const handleCancelImport = async () => {
     // Confirmation dialog
     if (importedTransactions.length > 0) {
-      if (!confirm('Are you sure you want to cancel this import? All categorizations will be lost.')) {
+      const confirmed = await confirm({
+        title: 'Cancel this import?',
+        description: 'All categorizations will be lost.',
+        confirmLabel: 'Discard import',
+        destructive: true,
+      });
+      if (!confirmed) {
         return;
       }
     }
@@ -220,9 +236,9 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
       // Mark all as applied
       setImportedTransactions(importedTransactions.map(t => ({ ...t, isApplied: true })));
 
-      alert(`Successfully applied ${importedTransactions.length} transactions to ${currentMonth}/${currentYear}`);
+      toast.success(`Successfully applied ${importedTransactions.length} transactions to ${currentMonth}/${currentYear}`);
     } catch (error) {
-      alert(`Failed to apply transactions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to apply transactions: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -271,13 +287,11 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
           />
 
           {hasDuplicates && (
-            <div className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
-              <input
-                type="checkbox"
+            <div className="flex items-center gap-3 p-4 bg-warning/10 border border-warning/30 rounded-lg">
+              <Checkbox
                 id="ignore-duplicates"
                 checked={ignoreDuplicates}
-                onChange={(e) => setIgnoreDuplicates(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                onCheckedChange={(checked) => setIgnoreDuplicates(checked === true)}
               />
               <label htmlFor="ignore-duplicates" className="text-sm font-medium cursor-pointer flex-1">
                 Ignore duplicate transactions when applying to monthly expenses
@@ -296,7 +310,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
                     Ready to apply transactions to <span className="font-semibold">{currentMonth}/{currentYear}</span>
                   </p>
                   {!allReviewed && (
-                    <p className="text-xs text-yellow-600">
+                    <p className="text-xs text-warning">
                       Some transactions are uncategorized. They will be skipped.
                     </p>
                   )}

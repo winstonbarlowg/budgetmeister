@@ -31,7 +31,7 @@ export const ImportHistoryItem: React.FC<ImportHistoryItemProps> = ({
     : 'Unknown';
 
   return (
-    <Card className="hover:border-blue-300 transition-colors">
+    <Card className="hover:border-info/50 transition-colors">
       <CardContent className="pt-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 space-y-2">

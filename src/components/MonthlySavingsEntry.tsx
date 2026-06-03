@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, PiggyBank, TrendingUp } from 'lucide-react';
 import { MonthData, MoneyMovement } from '../types';
 import { Button } from './ui/button';
+import { useConfirm } from './ui/confirm-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
@@ -13,6 +15,7 @@ import { CurrencyInput } from './CurrencyInput';
 interface MonthlySavingsEntryProps {
   monthData: MonthData;
   onSave: (data: MonthData) => void;
+  onHasChangesChange?: (hasChanges: boolean) => void;
 }
 
 interface MovementFormData {
@@ -27,7 +30,9 @@ interface MovementFormData {
 export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
   monthData,
   onSave,
+  onHasChangesChange,
 }) => {
+  const confirm = useConfirm();
   const [movements, setMovements] = useState<MoneyMovement[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -46,6 +51,10 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
     setMovements(monthData.moneyMovements || []);
     setHasChanges(false);
   }, [monthData]);
+
+  useEffect(() => {
+    onHasChangesChange?.(hasChanges);
+  }, [hasChanges]);
 
   // Calculate totals
   const totalSavings = movements
@@ -89,7 +98,7 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
 
   const handleSubmit = () => {
     if (!formData.category || !formData.sourceAccount || !formData.destinationAccount || formData.amount <= 0) {
-      alert('Please fill in all required fields with valid values');
+      toast.error('Please fill in all required fields with valid values');
       return;
     }
 
@@ -113,8 +122,14 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
     setIsDialogOpen(false);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this movement?')) {
+  const handleDelete = async (id: string) => {
+    const confirmed = await confirm({
+      title: 'Delete this movement?',
+      description: 'This savings/investment movement will be removed.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (confirmed) {
       setMovements(movements.filter(m => m.id !== id));
       setHasChanges(true);
     }
@@ -155,7 +170,7 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
               {/* Savings section */}
               {savingsMovements.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-sm font-semibold mb-3 flex items-center text-emerald-700">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center text-success">
                     <PiggyBank className="mr-2 h-4 w-4" />
                     Savings
                   </h3>
@@ -163,11 +178,11 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
                     {savingsMovements.map(movement => (
                       <div
                         key={movement.id}
-                        className="flex items-center justify-between p-3 rounded-lg border bg-emerald-50/50 border-emerald-200"
+                        className="flex items-center justify-between p-3 rounded-lg border bg-success/5 border-success/30"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-3">
-                            <span className="font-semibold text-emerald-700">{formatCurrency(movement.amount)}</span>
+                            <span className="font-semibold text-success">{formatCurrency(movement.amount)}</span>
                             <span className="text-sm text-muted-foreground">•</span>
                             <span className="text-sm font-medium">{movement.category}</span>
                           </div>
@@ -207,7 +222,7 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
               {/* Investments section */}
               {investmentMovements.length > 0 && (
                 <div className="mb-6">
-                  <h3 className="text-sm font-semibold mb-3 flex items-center text-blue-700">
+                  <h3 className="text-sm font-semibold mb-3 flex items-center text-info">
                     <TrendingUp className="mr-2 h-4 w-4" />
                     Investments
                   </h3>
@@ -215,11 +230,11 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
                     {investmentMovements.map(movement => (
                       <div
                         key={movement.id}
-                        className="flex items-center justify-between p-3 rounded-lg border bg-blue-50/50 border-blue-200"
+                        className="flex items-center justify-between p-3 rounded-lg border bg-info/5 border-info/30"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-3">
-                            <span className="font-semibold text-blue-700">{formatCurrency(movement.amount)}</span>
+                            <span className="font-semibold text-info">{formatCurrency(movement.amount)}</span>
                             <span className="text-sm text-muted-foreground">•</span>
                             <span className="text-sm font-medium">{movement.category}</span>
                           </div>
@@ -260,10 +275,10 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
               <div className="border-t pt-4 flex justify-between items-center">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Total Savings:</span>{' '}
-                  <span className="font-semibold text-emerald-600">{formatCurrency(totalSavings)}</span>
+                  <span className="font-semibold text-success">{formatCurrency(totalSavings)}</span>
                   {' | '}
                   <span className="text-muted-foreground">Investments:</span>{' '}
-                  <span className="font-semibold text-blue-600">{formatCurrency(totalInvestments)}</span>
+                  <span className="font-semibold text-info">{formatCurrency(totalInvestments)}</span>
                   {' | '}
                   <span className="text-muted-foreground">Total:</span>{' '}
                   <span className="font-bold">{formatCurrency(totalSavings + totalInvestments)}</span>

@@ -50,9 +50,9 @@ export const TransactionUpload: React.FC<TransactionUploadProps> = ({
   return (
     <div className="space-y-4">
       {/* Bank selector - required first */}
-      <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="p-4 bg-info/10 border border-info/30 rounded-lg">
         <label className="block text-sm font-medium mb-2">
-          Bank Format <span className="text-red-500">*</span>
+          Bank Format <span className="text-destructive">*</span>
         </label>
         <Select value={selectedBank || 'auto'} onValueChange={onBankChange}>
           <SelectTrigger className="w-full">

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { useConfirm } from './ui/confirm-dialog';
 import { formatCurrency, validateIncomeAmounts } from '../utils/calculations';
 
 interface IncomeManagerProps {
@@ -21,6 +22,7 @@ const PRESET_COLORS = [
 ];
 
 export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onSave }) => {
+  const confirm = useConfirm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
   const [formData, setFormData] = useState({
@@ -71,8 +73,14 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
     setIsModalOpen(true);
   };
 
-  const handleDelete = (sourceId: string) => {
-    if (confirm('Are you sure you want to delete this income source?')) {
+  const handleDelete = async (sourceId: string) => {
+    const confirmed = await confirm({
+      title: 'Delete this income source?',
+      description: 'This income source will be removed from your configuration.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (confirmed) {
       onSave(incomeSources.filter((s) => s.id !== sourceId));
     }
   };

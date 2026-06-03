@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { useConfirm } from './ui/confirm-dialog';
 import { formatCurrency } from '../utils/calculations';
 
 interface CategoryManagerProps {
@@ -22,6 +23,7 @@ const PRESET_COLORS = [
 ];
 
 export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onSave }) => {
+  const confirm = useConfirm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [formData, setFormData] = useState({
@@ -53,8 +55,14 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
     setIsModalOpen(true);
   };
 
-  const handleDelete = (categoryId: string) => {
-    if (confirm('Are you sure you want to delete this category?')) {
+  const handleDelete = async (categoryId: string) => {
+    const confirmed = await confirm({
+      title: 'Delete this category?',
+      description: 'This category will be removed from your budget configuration.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (confirmed) {
       onSave(categories.filter((c) => c.id !== categoryId));
     }
   };

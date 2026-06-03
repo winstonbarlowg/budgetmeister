@@ -17,6 +17,7 @@ interface MonthlyEntryProps {
   monthData: MonthData;
   onSave: (data: MonthData) => void;
   onMonthChange: (year: number, month: number) => void;
+  onHasChangesChange?: (hasChanges: boolean) => void;
 }
 
 export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
@@ -26,10 +27,13 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   monthData,
   onSave,
   onMonthChange,
+  onHasChangesChange,
 }) => {
   const [expenses, setExpenses] = useState<{ [categoryId: string]: number }>({});
   const [expenseDetails, setExpenseDetails] = useState<{ [categoryId: string]: MonthlyExpense }>({});
   const [hasChanges, setHasChanges] = useState(false);
+  const [incomeHasChanges, setIncomeHasChanges] = useState(false);
+  const [savingsHasChanges, setSavingsHasChanges] = useState(false);
 
   useEffect(() => {
     const expenseMap: { [categoryId: string]: number } = {};
@@ -45,6 +49,10 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
     setExpenseDetails(detailsMap);
     setHasChanges(false);
   }, [monthData]);
+
+  useEffect(() => {
+    onHasChangesChange?.(hasChanges || incomeHasChanges || savingsHasChanges);
+  }, [hasChanges, incomeHasChanges, savingsHasChanges]);
 
   const handleExpenseChange = (categoryId: string, amount: number) => {
     const currentDetail = expenseDetails[categoryId] || {
@@ -183,10 +191,10 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/40 shadow-lg shadow-blue-500/10">
+        <Card className="bg-gradient-to-br from-info/20 to-info/5 border-info/40 shadow-lg shadow-info/10">
           <CardHeader className="pb-3">
             <CardDescription className="font-semibold">Total Spent</CardDescription>
-            <CardTitle className="text-3xl text-blue-600">{formatCurrency(summary.totalActual)}</CardTitle>
+            <CardTitle className="text-3xl text-info">{formatCurrency(summary.totalActual)}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-sm">
@@ -221,12 +229,12 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
           </CardContent>
         </Card>
 
-        <Card className={summary.disposableIncome >= 0 ? "bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/40 shadow-lg shadow-purple-500/10" : "bg-gradient-to-br from-destructive/20 to-destructive/5 border-destructive/40 shadow-lg shadow-destructive/10"}>
+        <Card className={summary.disposableIncome >= 0 ? "bg-gradient-to-br from-highlight/20 to-highlight/5 border-highlight/40 shadow-lg shadow-highlight/10" : "bg-gradient-to-br from-destructive/20 to-destructive/5 border-destructive/40 shadow-lg shadow-destructive/10"}>
           <CardHeader className="pb-3">
             <CardDescription className="font-semibold">Disposable Income</CardDescription>
             <CardTitle className="text-3xl flex items-center gap-2">
-              <DollarSign className={`h-8 w-8 ${summary.disposableIncome >= 0 ? 'text-purple-600' : 'text-destructive'}`} />
-              <span className={summary.disposableIncome >= 0 ? 'text-purple-600 font-bold' : 'text-destructive font-bold'}>
+              <DollarSign className={`h-8 w-8 ${summary.disposableIncome >= 0 ? 'text-highlight' : 'text-destructive'}`} />
+              <span className={summary.disposableIncome >= 0 ? 'text-highlight font-bold' : 'text-destructive font-bold'}>
                 {formatCurrency(summary.disposableIncome)}
               </span>
             </CardTitle>
@@ -244,9 +252,9 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
               </p>
             )}
             {summary.totalMoneyMovements > 0 && (
-              <div className="mt-3 pt-3 border-t border-purple-200">
+              <div className="mt-3 pt-3 border-t border-highlight/30">
                 <p className="text-xs text-muted-foreground">After Savings & Investments:</p>
-                <div className={`text-lg font-semibold ${summary.netDisposableIncome >= 0 ? 'text-purple-600' : 'text-destructive'}`}>
+                <div className={`text-lg font-semibold ${summary.netDisposableIncome >= 0 ? 'text-highlight' : 'text-destructive'}`}>
                   {formatCurrency(summary.netDisposableIncome)}
                 </div>
               </div>
@@ -268,6 +276,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
             year={monthData.year}
             month={monthData.month}
             onSave={(income) => onSave({ ...monthData, income })}
+            onHasChangesChange={setIncomeHasChanges}
           />
         </CardContent>
       </Card>
@@ -276,6 +285,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
       <MonthlySavingsEntry
         monthData={monthData}
         onSave={onSave}
+        onHasChangesChange={setSavingsHasChanges}
       />
 
       {/* Expense Entry */}
@@ -322,7 +332,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                         <p className="text-sm text-muted-foreground">
                           Budget: {formatCurrency(category.budgetAmount)}
                           {hasImports && (
-                            <span className="ml-2 text-xs text-blue-600 font-medium">
+                            <span className="ml-2 text-xs text-info font-medium">
                               • {formatCurrency(detail.importedAmount || 0)} imported
                             </span>
                           )}
@@ -380,7 +390,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                         <p className="text-sm text-muted-foreground">
                           Budget: {formatCurrency(category.budgetAmount)}
                           {hasImports && (
-                            <span className="ml-2 text-xs text-blue-600 font-medium">
+                            <span className="ml-2 text-xs text-info font-medium">
                               • {formatCurrency(detail.importedAmount || 0)} imported
                             </span>
                           )}
@@ -395,20 +405,24 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                       min={minimum}
                     />
                   </div>
-                  <Progress
-                    value={category.actualAmount}
-                    max={category.budgetAmount}
-                    variant={category.percentUsed > 100 ? 'destructive' : category.percentUsed > 90 ? 'warning' : 'success'}
-                  />
-                  {category.percentUsed > 0 && (
-                    <p className="text-xs text-muted-foreground text-right">
-                      {category.percentUsed.toFixed(1)}% used
-                      {category.variance !== 0 && (
-                        <span className={category.variance > 0 ? 'text-destructive ml-2' : 'text-success ml-2'}>
-                          ({category.variance > 0 ? '+' : ''}{formatCurrency(category.variance)})
-                        </span>
+                  {category.budgetAmount > 0 && (
+                    <>
+                      <Progress
+                        value={category.actualAmount}
+                        max={category.budgetAmount}
+                        variant={category.percentUsed > 100 ? 'destructive' : category.percentUsed > 90 ? 'warning' : 'success'}
+                      />
+                      {category.percentUsed > 0 && (
+                        <p className="text-xs text-muted-foreground text-right">
+                          {category.percentUsed.toFixed(1)}% used
+                          {category.variance !== 0 && (
+                            <span className={category.variance > 0 ? 'text-destructive ml-2' : 'text-success ml-2'}>
+                              ({category.variance > 0 ? '+' : ''}{formatCurrency(category.variance)})
+                            </span>
+                          )}
+                        </p>
                       )}
-                    </p>
+                    </>
                   )}
                 </div>
               );

@@ -46,7 +46,7 @@ export const FileStatementSummary: React.FC<FileStatementSummaryProps> = ({
     .reduce((sum, t) => sum + t.amount, 0);
 
   return (
-    <Card className="border-blue-200 bg-blue-50">
+    <Card className="border-info/30 bg-info/10">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div>
@@ -81,7 +81,7 @@ export const FileStatementSummary: React.FC<FileStatementSummaryProps> = ({
           </div>
           <div>
             <p className="text-muted-foreground text-xs mb-1">Total Debits</p>
-            <p className="font-bold text-blue-700">{formatCurrency(totalDebitAmount)}</p>
+            <p className="font-bold text-info">{formatCurrency(totalDebitAmount)}</p>
           </div>
         </div>
       </CardContent>
