@@ -5,6 +5,7 @@ import { MonthlyEntry } from './components/MonthlyEntry';
 import { Visualizations } from './components/Visualizations';
 import { YearlyDashboard } from './components/YearlyDashboard';
 import { BankTransactions } from './components/BankTransactions';
+import { MonthTransactions } from './components/MonthTransactions';
 import { fileSystemManager } from './utils/fileSystem';
 import { calculateMonthSummary } from './utils/calculations';
 import { BudgetConfig, MonthData, MonthSummary, CategorizedTransaction } from './types';
@@ -330,6 +331,12 @@ function App() {
                 onSave={handleSaveMonthData}
                 onMonthChange={handleMonthChangeWithGuard}
                 onHasChangesChange={setMonthlyHasChanges}
+              />
+              <MonthTransactions
+                categories={config.categories}
+                monthData={monthData}
+                onSave={handleSaveMonthData}
+                disabled={monthlyHasChanges}
               />
             </div>
           )}
