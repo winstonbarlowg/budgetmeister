@@ -52,12 +52,32 @@ export interface MoneyMovement {
   notes?: string;
 }
 
+// Transaction stored in a month file (written by scripts/import_emma.py)
+export interface MonthTransaction {
+  id: string;
+  date: string;                  // "YYYY-MM-DD"
+  description: string;
+  merchant?: string | null;
+  amount: number;                // Always positive; see direction
+  direction: 'debit' | 'credit';
+  account: string;               // Short source label, e.g. "Amex" or "HSBC"
+  accountName?: string;          // Full account name from the bank
+  type?: string;                 // Bank transaction type, e.g. "Direct Debit"
+  categoryId: string | null;     // Category id, INCOME_CATEGORY_ID, or null when uncategorised
+  sourceCategory?: string;       // Category in the original export
+  excluded: boolean;             // Not counted towards expenses (e.g. transfers between own accounts)
+  excludeReason?: string;
+  userEdited?: boolean;          // Changed in the app; re-imports keep the user's choice
+  source: 'emma';
+}
+
 export interface MonthData {
   year: number;
   month: number; // 1-12
   expenses: MonthlyExpense[];
   income: MonthlyIncome[];
   moneyMovements: MoneyMovement[];
+  transactions?: MonthTransaction[];
 }
 
 export interface BudgetConfig {

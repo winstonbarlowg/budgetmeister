@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Save, TrendingDown, TrendingUp, DollarSign, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, TrendingDown, TrendingUp, DollarSign, RefreshCw, CalendarCheck } from 'lucide-react';
 import { MonthData, Category, MonthSummary, BudgetConfig, IncomeSource, MonthlyExpense } from '../types';
-import { calculateMonthSummary, formatCurrency, getMonthName, normalizeExpense, updateExpenseAmount, getMinimumExpenseAmount } from '../utils/calculations';
+import { calculateMonthSummary, formatCurrency, normalizeExpense, updateExpenseAmount, getMinimumExpenseAmount } from '../utils/calculations';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
@@ -9,6 +9,7 @@ import { Progress } from './ui/progress';
 import { MonthlyIncomeEntry } from './MonthlyIncomeEntry';
 import { MonthlySavingsEntry } from './MonthlySavingsEntry';
 import { CurrencyInput } from './CurrencyInput';
+import { MonthPicker } from './MonthPicker';
 
 interface MonthlyEntryProps {
   categories: Category[];
@@ -126,6 +127,13 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
     onMonthChange(newYear, newMonth);
   };
 
+  const today = new Date();
+  const isCurrentMonth = monthData.year === today.getFullYear() && monthData.month === today.getMonth() + 1;
+
+  const handleCurrentMonth = () => {
+    onMonthChange(today.getFullYear(), today.getMonth() + 1);
+  };
+
   const summary: MonthSummary = calculateMonthSummary(
     config,
     {
@@ -163,14 +171,17 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                 <ChevronLeft className="h-5 w-5" />
               </Button>
               <div>
-                <CardTitle className="text-3xl">
-                  {getMonthName(monthData.month)} {monthData.year}
-                </CardTitle>
-                <CardDescription>Enter your expenses for this month</CardDescription>
+                <MonthPicker year={monthData.year} month={monthData.month} onSelect={onMonthChange} />
+                <CardDescription className="mt-1.5">Enter your expenses for this month</CardDescription>
               </div>
               <Button variant="outline" size="icon" onClick={handleNextMonth}>
                 <ChevronRight className="h-5 w-5" />
               </Button>
+              {!isCurrentMonth && (
+                <Button variant="outline" onClick={handleCurrentMonth}>
+                  <CalendarCheck className="h-4 w-4" /> This month
+                </Button>
+              )}
             </div>
             <Button onClick={handleSave} disabled={!hasChanges} size="lg" variant="success">
               <Save className="h-5 w-5" /> Save Changes
