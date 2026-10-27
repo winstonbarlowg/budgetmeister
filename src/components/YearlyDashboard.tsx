@@ -3,6 +3,19 @@ import { MonthSummary } from '../types';
 import { formatCurrency, getMonthName } from '../utils/calculations';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from './ui/table';
+import { cn } from '../lib/utils';
+
+const varianceClass = (variance: number) => (variance <= 0 ? 'text-success' : 'text-destructive');
+
+const getStatus = (actual: number, percentUsed: number): { label: string; className: string } => {
+  if (actual === 0) return { label: 'No data', className: 'text-muted-foreground' };
+  if (percentUsed <= 90) return { label: 'Great', className: 'bg-success/15 text-success border-success/30' };
+  if (percentUsed <= 100) return { label: 'Good', className: 'bg-warning/15 text-warning border-warning/30' };
+  if (percentUsed <= 110) return { label: 'Caution', className: 'bg-warning/25 text-warning border-warning/50' };
+  return { label: 'Over', className: 'bg-destructive/15 text-destructive border-destructive/30' };
+};
 
 interface YearlyDashboardProps {
   year: number;
@@ -17,8 +30,10 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
   const avgMonthlyBudget = totalBudget / 12;
   const avgMonthlyActual = totalActual / yearData.filter(m => m.totalActual > 0).length || 0;
 
-  const bestMonth = [...yearData].sort((a, b) => a.totalVariance - b.totalVariance)[0];
-  const worstMonth = [...yearData].sort((a, b) => b.totalVariance - a.totalVariance)[0];
+  // Months with no spending yet (e.g. the rest of this year) would otherwise look fully under budget
+  const monthsWithSpending = yearData.filter(m => m.totalActual > 0);
+  const bestMonth = [...monthsWithSpending].sort((a, b) => a.totalVariance - b.totalVariance)[0];
+  const worstMonth = [...monthsWithSpending].sort((a, b) => b.totalVariance - a.totalVariance)[0];
 
   return (
     <div className="space-y-6">
@@ -29,50 +44,34 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
           <CardDescription>Annual budget summary and performance</CardDescription>
         </CardHeader>
         <CardContent>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Metric</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Annual Budget</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Total Spent</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Variance</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <td style={{ padding: '0.75rem', fontWeight: 600 }}>Total</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '1.125rem', fontWeight: 600 }}>
-                    {formatCurrency(totalBudget)}
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', fontSize: '1.125rem', fontWeight: 600 }}>
-                    {formatCurrency(totalActual)}
-                  </td>
-                  <td style={{
-                    padding: '0.75rem',
-                    textAlign: 'right',
-                    fontSize: '1.125rem',
-                    fontWeight: 700,
-                    color: totalVariance <= 0 ? '#059669' : '#dc2626'
-                  }}>
-                    {totalVariance > 0 ? '+' : ''}{formatCurrency(totalVariance)}
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '0.75rem', fontWeight: 600 }}>Average/Month</td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', color: '#6b7280' }}>
-                    {formatCurrency(avgMonthlyBudget)}
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', color: '#6b7280' }}>
-                    {formatCurrency(avgMonthlyActual)}
-                  </td>
-                  <td style={{ padding: '0.75rem', textAlign: 'right', color: '#6b7280' }}>
-                    {totalVariance <= 0 ? 'Under budget' : 'Over budget'}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Metric</TableHead>
+                <TableHead className="text-right">Annual Budget</TableHead>
+                <TableHead className="text-right">Total Spent</TableHead>
+                <TableHead className="text-right">Variance</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-semibold">Total</TableCell>
+                <TableCell className="text-right text-lg font-semibold tabular-nums">{formatCurrency(totalBudget)}</TableCell>
+                <TableCell className="text-right text-lg font-semibold tabular-nums">{formatCurrency(totalActual)}</TableCell>
+                <TableCell className={cn('text-right text-lg font-bold tabular-nums', varianceClass(totalVariance))}>
+                  {totalVariance > 0 ? '+' : ''}{formatCurrency(totalVariance)}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-semibold">Average/Month</TableCell>
+                <TableCell className="text-right text-muted-foreground tabular-nums">{formatCurrency(avgMonthlyBudget)}</TableCell>
+                <TableCell className="text-right text-muted-foreground tabular-nums">{formatCurrency(avgMonthlyActual)}</TableCell>
+                <TableCell className="text-right text-muted-foreground">
+                  {totalVariance <= 0 ? 'Under budget' : 'Over budget'}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
@@ -85,6 +84,9 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {!bestMonth && (
+              <p className="text-sm text-muted-foreground">No spending recorded this year yet.</p>
+            )}
             {bestMonth && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -92,8 +94,10 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
                   <div className="text-2xl font-bold">{getMonthName(bestMonth.month)}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Under Budget</div>
-                  <div className="text-2xl font-bold text-success">
+                  <div className="text-sm text-muted-foreground mb-1">
+                    {bestMonth.totalVariance > 0 ? 'Over Budget' : 'Under Budget'}
+                  </div>
+                  <div className={`text-2xl font-bold ${bestMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
                     {formatCurrency(Math.abs(bestMonth.totalVariance))}
                   </div>
                 </div>
@@ -117,6 +121,9 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {!worstMonth && (
+              <p className="text-sm text-muted-foreground">No spending recorded this year yet.</p>
+            )}
             {worstMonth && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -152,93 +159,57 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
           <CardDescription>Detailed month-by-month performance</CardDescription>
         </CardHeader>
         <CardContent>
-          <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                <th style={{ padding: '0.75rem', textAlign: 'left' }}>Month</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>Budget</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>Actual</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>Variance</th>
-                <th style={{ padding: '0.75rem', textAlign: 'right' }}>% Used</th>
-                <th style={{ padding: '0.75rem', textAlign: 'center' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Month</TableHead>
+                <TableHead className="text-right">Budget</TableHead>
+                <TableHead className="text-right">Actual</TableHead>
+                <TableHead className="text-right">Variance</TableHead>
+                <TableHead className="text-right">% Used</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {yearData.map((month) => {
                 const percentUsed = month.totalBudget > 0
                   ? (month.totalActual / month.totalBudget) * 100
                   : 0;
+                const status = getStatus(month.totalActual, percentUsed);
 
                 return (
-                  <tr key={month.month} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <td style={{ padding: '0.75rem', fontWeight: 600 }}>
-                      {getMonthName(month.month)}
-                    </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                      {formatCurrency(month.totalBudget)}
-                    </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                      {formatCurrency(month.totalActual)}
-                    </td>
-                    <td
-                      style={{
-                        padding: '0.75rem',
-                        textAlign: 'right',
-                        color: month.totalVariance <= 0 ? '#10b981' : '#ef4444',
-                        fontWeight: 600,
-                      }}
-                    >
+                  <TableRow key={month.month}>
+                    <TableCell className="font-semibold">{getMonthName(month.month)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(month.totalBudget)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(month.totalActual)}</TableCell>
+                    <TableCell className={cn('text-right font-semibold tabular-nums', varianceClass(month.totalVariance))}>
                       {month.totalVariance > 0 ? '+' : ''}
                       {formatCurrency(month.totalVariance)}
-                    </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'right' }}>
-                      {percentUsed.toFixed(1)}%
-                    </td>
-                    <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                      {month.totalActual === 0 ? (
-                        <span style={{ color: '#9ca3af' }}>No data</span>
-                      ) : percentUsed <= 90 ? (
-                        <span style={{ color: '#10b981', fontWeight: 600 }}>Great</span>
-                      ) : percentUsed <= 100 ? (
-                        <span style={{ color: '#f59e0b', fontWeight: 600 }}>Good</span>
-                      ) : percentUsed <= 110 ? (
-                        <span style={{ color: '#f97316', fontWeight: 600 }}>Caution</span>
-                      ) : (
-                        <span style={{ color: '#ef4444', fontWeight: 600 }}>Over</span>
-                      )}
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{percentUsed.toFixed(1)}%</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className={status.className}>{status.label}</Badge>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '2px solid #e5e7eb', fontWeight: 700, fontSize: '1.1rem' }}>
-                <td style={{ padding: '1rem' }}>Total</td>
-                <td style={{ padding: '1rem', textAlign: 'right' }}>
-                  {formatCurrency(totalBudget)}
-                </td>
-                <td style={{ padding: '1rem', textAlign: 'right' }}>
-                  {formatCurrency(totalActual)}
-                </td>
-                <td
-                  style={{
-                    padding: '1rem',
-                    textAlign: 'right',
-                    color: totalVariance <= 0 ? '#10b981' : '#ef4444',
-                  }}
-                >
+            </TableBody>
+            <TableFooter>
+              <TableRow className="text-base font-bold hover:bg-transparent">
+                <TableCell>Total</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(totalBudget)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(totalActual)}</TableCell>
+                <TableCell className={cn('text-right tabular-nums', varianceClass(totalVariance))}>
                   {totalVariance > 0 ? '+' : ''}
                   {formatCurrency(totalVariance)}
-                </td>
-                <td style={{ padding: '1rem', textAlign: 'right' }}>
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
                   {totalBudget > 0 ? ((totalActual / totalBudget) * 100).toFixed(1) : 0}%
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-          </div>
+                </TableCell>
+                <TableCell />
+              </TableRow>
+            </TableFooter>
+          </Table>
         </CardContent>
       </Card>
     </div>

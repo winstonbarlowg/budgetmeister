@@ -18,6 +18,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { MonthSummary } from '../types';
 import { formatCurrency, getMonthShortName, getMonthName } from '../utils/calculations';
+import { Label } from './ui/label';
+import { Progress } from './ui/progress';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { cn } from '../lib/utils';
+
+// Heatmap cell colours; the legend uses the same classes so they always match
+const HEATMAP_CLASSES = {
+  wellUnder: 'bg-emerald-400 text-emerald-950',
+  under: 'bg-green-300 text-green-950',
+  onTrack: 'bg-amber-300 text-amber-950',
+  caution: 'bg-orange-400 text-orange-950',
+  over: 'bg-rose-400 text-rose-950',
+} as const;
+
+const HEATMAP_LEGEND: { key: keyof typeof HEATMAP_CLASSES; label: string }[] = [
+  { key: 'wellUnder', label: 'Well under budget' },
+  { key: 'under', label: 'Under budget' },
+  { key: 'onTrack', label: 'On track' },
+  { key: 'caution', label: 'Slightly over' },
+  { key: 'over', label: 'Over budget' },
+];
 
 interface VisualizationsProps {
   currentMonth: MonthSummary;
@@ -165,6 +186,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   // 7. Category Variance Heatmap (simplified grid view)
   const heatmapData = currentMonth.categories.map((category) => {
     const monthlyData = yearData.map((month) => {
+      if (month.totalActual === 0) return null; // no spending recorded that month
       const cat = month.categories.find((c) => c.id === category.id);
       if (!cat) return 0;
       const variance = cat.variance;
@@ -178,12 +200,13 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
     };
   });
 
-  const getHeatmapColor = (percentVariance: number) => {
-    if (percentVariance <= -20) return '#34d399'; // emerald-400 - strong green (very good)
-    if (percentVariance <= -10) return '#4ade80'; // green-400 - lime (good)
-    if (percentVariance <= 10) return '#fbbf24'; // amber-400 - gold (neutral)
-    if (percentVariance <= 20) return '#fb923c'; // orange-400 - coral (caution)
-    return '#fb7185'; // rose-400 - rose (over budget)
+  const getHeatmapClass = (percentVariance: number | null) => {
+    if (percentVariance === null || percentVariance === 0) return 'bg-muted/50 text-muted-foreground'; // shown as "-": nothing to compare
+    if (percentVariance <= -20) return HEATMAP_CLASSES.wellUnder;
+    if (percentVariance <= -10) return HEATMAP_CLASSES.under;
+    if (percentVariance <= 10) return HEATMAP_CLASSES.onTrack;
+    if (percentVariance <= 20) return HEATMAP_CLASSES.caution;
+    return HEATMAP_CLASSES.over;
   };
 
   return (
@@ -198,7 +221,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
             </div>
             <div className="flex items-center gap-3">
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-muted-foreground">Year</label>
+                <Label className="text-xs text-muted-foreground">Year</Label>
                 <Select value={selectedYear.toString()} onValueChange={(val) => handleYearChange(parseInt(val))}>
                   <SelectTrigger className="w-[100px]">
                     <SelectValue />
@@ -213,7 +236,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
                 </Select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-muted-foreground">Month</label>
+                <Label className="text-xs text-muted-foreground">Month</Label>
                 <Select value={selectedMonthIndex.toString()} onValueChange={(val) => setSelectedMonthIndex(parseInt(val))}>
                   <SelectTrigger className="w-[140px]">
                     <SelectValue />
@@ -368,40 +391,33 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
           <CardDescription>Budget performance across all months</CardDescription>
         </CardHeader>
         <CardContent>
-          <div style={{ padding: '2rem' }}>
-            <div style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span>Budget Used: {ytdPercent.toFixed(1)}%</span>
-                <span>{formatCurrency(ytdActual)} / {formatCurrency(ytdBudget)}</span>
+          <div className="space-y-8 p-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Budget used: {ytdPercent.toFixed(1)}%</span>
+                <span className="text-muted-foreground tabular-nums">
+                  {formatCurrency(ytdActual)} / {formatCurrency(ytdBudget)}
+                </span>
               </div>
-              <div className="progress-bar" style={{ height: '24px' }}>
-                <div
-                  className={`progress-fill ${ytdPercent > 100 ? 'over-budget' : ''}`}
-                  style={{ width: `${Math.min(ytdPercent, 100)}%` }}
-                />
-              </div>
+              <Progress
+                value={ytdPercent}
+                className="h-6"
+                variant={ytdPercent > 100 ? 'destructive' : ytdPercent > expectedPercent ? 'warning' : 'success'}
+              />
             </div>
-            <div style={{ marginTop: '2rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span>Expected at this point: {expectedPercent.toFixed(1)}%</span>
+            <div className="space-y-2">
+              <div className="text-sm text-muted-foreground">
+                Expected at this point: {expectedPercent.toFixed(1)}%
               </div>
-              <div className="progress-bar" style={{ height: '12px', background: '#e0e0e0' }}>
-                <div
-                  style={{
-                    width: `${Math.min(expectedPercent, 100)}%`,
-                    height: '100%',
-                    background: '#9ca3af',
-                  }}
-                />
-              </div>
+              <Progress value={expectedPercent} className="h-3 [&>div]:bg-muted-foreground/50" />
             </div>
-            <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+            <div className="text-center font-semibold">
               {ytdPercent <= expectedPercent ? (
-                <div style={{ color: '#10b981', fontWeight: 600 }}>On track!</div>
+                <span className="text-success">On track!</span>
               ) : (
-                <div style={{ color: '#ef4444', fontWeight: 600 }}>
+                <span className="text-destructive">
                   {(ytdPercent - expectedPercent).toFixed(1)}% over expected pace
-                </div>
+                </span>
               )}
             </div>
           </div>
@@ -436,60 +452,41 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
           <CardDescription>Yearly variance percentages by category and month</CardDescription>
         </CardHeader>
         <CardContent>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ padding: '0.75rem', textAlign: 'left', borderBottom: '2px solid #e5e7eb' }}>
-                    Category
-                  </th>
-                  {yearData.map((month) => (
-                    <th
-                      key={month.month}
-                      style={{ padding: '0.75rem', textAlign: 'center', borderBottom: '2px solid #e5e7eb' }}
-                    >
-                      {getMonthShortName(month.month)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {heatmapData.map((row) => (
-                  <tr key={row.category}>
-                    <td style={{ padding: '0.75rem', fontWeight: 500 }}>{row.category}</td>
-                    {row.months.map((variance, idx) => (
-                      <td
-                        key={idx}
-                        style={{
-                          padding: '0.75rem',
-                          textAlign: 'center',
-                          backgroundColor: getHeatmapColor(variance),
-                          color: Math.abs(variance) > 15 ? 'white' : '#1a1a1a',
-                          fontWeight: 500,
-                        }}
-                        title={`${variance > 0 ? '+' : ''}${variance.toFixed(1)}%`}
-                      >
-                        {variance !== 0 ? `${variance > 0 ? '+' : ''}${variance.toFixed(0)}%` : '-'}
-                      </td>
-                    ))}
-                  </tr>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead>Category</TableHead>
+                {yearData.map((month) => (
+                  <TableHead key={month.month} className="text-center">
+                    {getMonthShortName(month.month)}
+                  </TableHead>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', justifyContent: 'center', fontSize: '0.875rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '20px', height: '20px', background: '#10b981', borderRadius: '4px' }} />
-              <span>Well under budget</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '20px', height: '20px', background: '#fbbf24', borderRadius: '4px' }} />
-              <span>On track</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '20px', height: '20px', background: '#ef4444', borderRadius: '4px' }} />
-              <span>Over budget</span>
-            </div>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {heatmapData.map((row) => (
+                <TableRow key={row.category} className="hover:bg-transparent">
+                  <TableCell className="font-medium whitespace-nowrap">{row.category}</TableCell>
+                  {row.months.map((variance, idx) => (
+                    <TableCell
+                      key={idx}
+                      className={cn('text-center font-medium tabular-nums', getHeatmapClass(variance))}
+                      title={variance === null ? 'No spending recorded' : `${variance > 0 ? '+' : ''}${variance.toFixed(1)}%`}
+                    >
+                      {variance !== null && variance !== 0 ? `${variance > 0 ? '+' : ''}${variance.toFixed(0)}%` : '-'}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          <div className="mt-4 flex flex-wrap justify-center gap-4 text-sm">
+            {HEATMAP_LEGEND.map(({ key, label }) => (
+              <div key={key} className="flex items-center gap-2">
+                <div className={cn('h-5 w-5 rounded', HEATMAP_CLASSES[key])} />
+                <span>{label}</span>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

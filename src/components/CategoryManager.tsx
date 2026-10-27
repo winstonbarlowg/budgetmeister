@@ -1,13 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { Category } from '../types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useConfirm } from './ui/confirm-dialog';
+import { ColorSwatchPicker } from './ColorSwatchPicker';
+import { MoneyInput } from './MoneyInput';
 import { formatCurrency } from '../utils/calculations';
 
 interface CategoryManagerProps {
@@ -22,20 +27,49 @@ const PRESET_COLORS = [
   '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
 ];
 
+const slugify = (name: string) => name.trim().toLowerCase().replace(/\s+/g, '-');
+
+type CategoryFormValues = {
+  name: string;
+  type: 'fixed' | 'variable';
+  budgetAmount: number;
+  color: string;
+};
+
 export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onSave }) => {
   const confirm = useConfirm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    type: 'variable' as 'fixed' | 'variable',
-    budgetAmount: 0,
-    color: PRESET_COLORS[0],
+
+  // Rebuilt per render so the duplicate check knows which category is being edited
+  const categorySchema = z.object({
+    name: z
+      .string()
+      .trim()
+      .min(1, 'Give this category a name')
+      .refine(
+        name => !categories.some(c =>
+          c.id !== editingCategory?.id &&
+          (c.name.toLowerCase() === name.toLowerCase() || (!editingCategory && c.id === slugify(name)))
+        ),
+        'A category with this name already exists'
+      ),
+    type: z.enum(['fixed', 'variable']),
+    budgetAmount: z.number().min(0, 'Must be zero or more'),
+    color: z.string(),
+  });
+
+  const schemaRef = useRef(categorySchema);
+  schemaRef.current = categorySchema;
+
+  const form = useForm<CategoryFormValues>({
+    resolver: (values, context, options) => zodResolver(schemaRef.current)(values, context, options),
+    defaultValues: { name: '', type: 'variable', budgetAmount: 0, color: PRESET_COLORS[0] },
   });
 
   const handleAdd = () => {
     setEditingCategory(null);
-    setFormData({
+    form.reset({
       name: '',
       type: 'variable',
       budgetAmount: 0,
@@ -46,7 +80,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
-    setFormData({
+    form.reset({
       name: category.name,
       type: category.type,
       budgetAmount: category.budgetAmount,
@@ -67,19 +101,19 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (values: CategoryFormValues) => {
+    const data = { ...values, name: values.name.trim() };
 
     if (editingCategory) {
       onSave(
         categories.map((c) =>
-          c.id === editingCategory.id ? { ...c, ...formData } : c
+          c.id === editingCategory.id ? { ...c, ...data } : c
         )
       );
     } else {
       const newCategory: Category = {
-        id: formData.name.toLowerCase().replace(/\s+/g, '-'),
-        ...formData,
+        id: slugify(data.name),
+        ...data,
       };
       onSave([...categories, newCategory]);
     }
@@ -236,69 +270,68 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Category Name</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Groceries"
-                required
-              />
-            </div>
+          <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4" noValidate>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Category Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Groceries" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value: 'fixed' | 'variable') =>
-                  setFormData({ ...formData, type: value })
-                }
-              >
-                <SelectTrigger id="type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">Fixed - Same amount every month</SelectItem>
-                  <SelectItem value="variable">Variable - Changes each month</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Type</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="fixed">Fixed - Same amount every month</SelectItem>
+                      <SelectItem value="variable">Variable - Changes each month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="budget">Monthly Budget</Label>
-              <Input
-                id="budget"
-                type="number"
-                value={formData.budgetAmount}
-                onChange={(e) =>
-                  setFormData({ ...formData, budgetAmount: parseFloat(e.target.value) || 0 })
-                }
-                placeholder="0.00"
-                step="0.01"
-                min="0"
-                required
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="budgetAmount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Monthly Budget</FormLabel>
+                  <FormControl>
+                    <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <div className="grid grid-cols-8 gap-2">
-                {PRESET_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className="h-10 w-10 rounded-lg transition-transform hover:scale-110"
-                    style={{
-                      backgroundColor: color,
-                      border: formData.color === color ? '3px solid #000' : '1px solid #e5e7eb',
-                    }}
-                    onClick={() => setFormData({ ...formData, color })}
-                  />
-                ))}
-              </div>
-            </div>
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Color</FormLabel>
+                  <ColorSwatchPicker colors={PRESET_COLORS} value={field.value} onChange={field.onChange} />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
@@ -307,6 +340,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
               <Button type="submit">{editingCategory ? 'Save Changes' : 'Add Category'}</Button>
             </DialogFooter>
           </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </>
