@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useConfirm } from './ui/confirm-dialog';
+import { MonthPickerField } from './MonthPicker';
+import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { formatCurrency, validateIncomeAmounts } from '../utils/calculations';
 
 interface IncomeManagerProps {
@@ -87,6 +89,10 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
 
   const validateForm = (): boolean => {
     // Validate dates
+    if (!formData.startDate) {
+      setValidationWarning('Choose a start month');
+      return false;
+    }
     if (formData.endDate && formData.endDate < formData.startDate) {
       setValidationWarning('End date must be after start date');
       return false;
@@ -284,24 +290,22 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date</Label>
-                <Input
+                <Label htmlFor="startDate">Start Month</Label>
+                <MonthPickerField
                   id="startDate"
-                  type="month"
                   value={formData.startDate}
-                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  required
+                  onChange={(startDate) => setFormData({ ...formData, startDate })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endDate">End Date (Optional)</Label>
-                <Input
+                <Label htmlFor="endDate">End Month (Optional)</Label>
+                <MonthPickerField
                   id="endDate"
-                  type="month"
                   value={formData.endDate}
-                  onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  placeholder="Leave empty for ongoing"
+                  onChange={(endDate) => setFormData({ ...formData, endDate })}
+                  placeholder="Ongoing"
+                  clearable
                 />
               </div>
             </div>
@@ -397,20 +401,11 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
 
             <div className="space-y-2">
               <Label>Color</Label>
-              <div className="grid grid-cols-8 gap-2">
-                {PRESET_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className="h-10 w-10 rounded-lg transition-transform hover:scale-110"
-                    style={{
-                      backgroundColor: color,
-                      border: formData.color === color ? '3px solid #000' : '1px solid #e5e7eb',
-                    }}
-                    onClick={() => setFormData({ ...formData, color })}
-                  />
-                ))}
-              </div>
+              <ColorSwatchPicker
+                colors={PRESET_COLORS}
+                value={formData.color}
+                onChange={(color) => setFormData({ ...formData, color })}
+              />
             </div>
 
             <DialogFooter>

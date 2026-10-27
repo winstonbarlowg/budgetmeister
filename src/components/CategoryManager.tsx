@@ -8,6 +8,7 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useConfirm } from './ui/confirm-dialog';
+import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { formatCurrency } from '../utils/calculations';
 
 interface CategoryManagerProps {
@@ -284,20 +285,11 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
 
             <div className="space-y-2">
               <Label>Color</Label>
-              <div className="grid grid-cols-8 gap-2">
-                {PRESET_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className="h-10 w-10 rounded-lg transition-transform hover:scale-110"
-                    style={{
-                      backgroundColor: color,
-                      border: formData.color === color ? '3px solid #000' : '1px solid #e5e7eb',
-                    }}
-                    onClick={() => setFormData({ ...formData, color })}
-                  />
-                ))}
-              </div>
+              <ColorSwatchPicker
+                colors={PRESET_COLORS}
+                value={formData.color}
+                onChange={(color) => setFormData({ ...formData, color })}
+              />
             </div>
 
             <DialogFooter>
