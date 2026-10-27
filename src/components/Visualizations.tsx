@@ -186,6 +186,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   // 7. Category Variance Heatmap (simplified grid view)
   const heatmapData = currentMonth.categories.map((category) => {
     const monthlyData = yearData.map((month) => {
+      if (month.totalActual === 0) return null; // no spending recorded that month
       const cat = month.categories.find((c) => c.id === category.id);
       if (!cat) return 0;
       const variance = cat.variance;
@@ -199,8 +200,8 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
     };
   });
 
-  const getHeatmapClass = (percentVariance: number) => {
-    if (percentVariance === 0) return 'bg-muted/50 text-muted-foreground'; // shown as "-": nothing to compare
+  const getHeatmapClass = (percentVariance: number | null) => {
+    if (percentVariance === null || percentVariance === 0) return 'bg-muted/50 text-muted-foreground'; // shown as "-": nothing to compare
     if (percentVariance <= -20) return HEATMAP_CLASSES.wellUnder;
     if (percentVariance <= -10) return HEATMAP_CLASSES.under;
     if (percentVariance <= 10) return HEATMAP_CLASSES.onTrack;
@@ -470,9 +471,9 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
                     <TableCell
                       key={idx}
                       className={cn('text-center font-medium tabular-nums', getHeatmapClass(variance))}
-                      title={`${variance > 0 ? '+' : ''}${variance.toFixed(1)}%`}
+                      title={variance === null ? 'No spending recorded' : `${variance > 0 ? '+' : ''}${variance.toFixed(1)}%`}
                     >
-                      {variance !== 0 ? `${variance > 0 ? '+' : ''}${variance.toFixed(0)}%` : '-'}
+                      {variance !== null && variance !== 0 ? `${variance > 0 ? '+' : ''}${variance.toFixed(0)}%` : '-'}
                     </TableCell>
                   ))}
                 </TableRow>

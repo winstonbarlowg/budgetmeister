@@ -30,8 +30,10 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
   const avgMonthlyBudget = totalBudget / 12;
   const avgMonthlyActual = totalActual / yearData.filter(m => m.totalActual > 0).length || 0;
 
-  const bestMonth = [...yearData].sort((a, b) => a.totalVariance - b.totalVariance)[0];
-  const worstMonth = [...yearData].sort((a, b) => b.totalVariance - a.totalVariance)[0];
+  // Months with no spending yet (e.g. the rest of this year) would otherwise look fully under budget
+  const monthsWithSpending = yearData.filter(m => m.totalActual > 0);
+  const bestMonth = [...monthsWithSpending].sort((a, b) => a.totalVariance - b.totalVariance)[0];
+  const worstMonth = [...monthsWithSpending].sort((a, b) => b.totalVariance - a.totalVariance)[0];
 
   return (
     <div className="space-y-6">
@@ -82,6 +84,9 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {!bestMonth && (
+              <p className="text-sm text-muted-foreground">No spending recorded this year yet.</p>
+            )}
             {bestMonth && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -89,8 +94,10 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
                   <div className="text-2xl font-bold">{getMonthName(bestMonth.month)}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Under Budget</div>
-                  <div className="text-2xl font-bold text-success">
+                  <div className="text-sm text-muted-foreground mb-1">
+                    {bestMonth.totalVariance > 0 ? 'Over Budget' : 'Under Budget'}
+                  </div>
+                  <div className={`text-2xl font-bold ${bestMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
                     {formatCurrency(Math.abs(bestMonth.totalVariance))}
                   </div>
                 </div>
@@ -114,6 +121,9 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {!worstMonth && (
+              <p className="text-sm text-muted-foreground">No spending recorded this year yet.</p>
+            )}
             {worstMonth && (
               <div className="grid grid-cols-2 gap-4">
                 <div>
