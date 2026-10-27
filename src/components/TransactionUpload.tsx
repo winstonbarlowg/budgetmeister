@@ -1,5 +1,9 @@
+import { useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { cn } from '../lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { getBankDisplayName } from '../utils/csvParser';
 
@@ -25,12 +29,20 @@ export const TransactionUpload: React.FC<TransactionUploadProps> = ({
     { value: 'starling', label: getBankDisplayName('starling') },
     { value: 'generic', label: getBankDisplayName('generic') },
   ];
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const openFilePicker = () => {
+    if (!isProcessing) fileInputRef.current?.click();
+  };
+
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    setIsDragging(false);
 
     const files = e.dataTransfer.files;
-    if (files.length > 0 && files[0].name.endsWith('.csv')) {
+    if (!isProcessing && files.length > 0 && files[0].name.toLowerCase().endsWith('.csv')) {
       onUpload(files[0]);
     }
   };
@@ -38,6 +50,7 @@ export const TransactionUpload: React.FC<TransactionUploadProps> = ({
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    setIsDragging(true);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,17 +58,16 @@ export const TransactionUpload: React.FC<TransactionUploadProps> = ({
     if (files && files.length > 0) {
       onUpload(files[0]);
     }
+    e.target.value = ''; // allow picking the same file again
   };
 
   return (
     <div className="space-y-4">
-      {/* Bank selector - required first */}
-      <div className="p-4 bg-info/10 border border-info/30 rounded-lg">
-        <label className="block text-sm font-medium mb-2">
-          Bank Format <span className="text-destructive">*</span>
-        </label>
+      {/* Bank selector */}
+      <div className="space-y-2 rounded-lg border border-info/30 bg-info/10 p-4">
+        <Label htmlFor="bank-format">Bank Format</Label>
         <Select value={selectedBank || 'auto'} onValueChange={onBankChange}>
-          <SelectTrigger className="w-full">
+          <SelectTrigger id="bank-format" className="w-full">
             <SelectValue placeholder="Select bank format" />
           </SelectTrigger>
           <SelectContent>
@@ -66,40 +78,49 @@ export const TransactionUpload: React.FC<TransactionUploadProps> = ({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground mt-2">
+        <p className="text-xs text-muted-foreground">
           Select your bank to ensure correct transaction parsing. Use "Auto-detect" if unsure.
         </p>
       </div>
 
-      {/* File upload area - always enabled now */}
+      {/* Drop zone: click, keyboard or drag a file onto it */}
       <div
+        role="button"
+        tabIndex={isProcessing ? -1 : 0}
+        aria-disabled={isProcessing}
+        onClick={openFilePicker}
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openFilePicker();
+          }
+        }}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
-        className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer"
+        onDragLeave={() => setIsDragging(false)}
+        className={cn(
+          'rounded-lg border-2 border-dashed p-8 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          isProcessing ? 'cursor-wait opacity-60' : 'cursor-pointer hover:border-primary hover:bg-muted/40',
+          isDragging && 'border-primary bg-primary/5'
+        )}
       >
-        <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <p className="text-sm text-muted-foreground mb-4">
-          {isProcessing ? 'Processing...' : 'Drag & drop CSV file here, or click to browse'}
+        <Upload className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+        <p className="mb-4 text-sm text-muted-foreground">
+          {isProcessing ? 'Processing...' : isDragging ? 'Drop the CSV file to import it' : 'Drag & drop a CSV file here, or click to browse'}
         </p>
-        <input
+        <Input
+          ref={fileInputRef}
           type="file"
           accept=".csv"
           onChange={handleFileSelect}
+          onClick={e => e.stopPropagation()}
           className="hidden"
-          id="csv-upload"
           disabled={isProcessing}
         />
-        <label htmlFor="csv-upload">
-          <Button variant="outline" disabled={isProcessing} type="button" onClick={(e) => {
-            if (!isProcessing) {
-              document.getElementById('csv-upload')?.click();
-            }
-            e.preventDefault();
-          }}>
-            Choose File
-          </Button>
-        </label>
-        <p className="text-xs text-muted-foreground mt-4">
+        <Button variant="outline" type="button" disabled={isProcessing} tabIndex={-1}>
+          Choose File
+        </Button>
+        <p className="mt-4 text-xs text-muted-foreground">
           Supports: Amex UK, Barclays, HSBC, Monzo, Starling, and generic CSV formats
         </p>
       </div>

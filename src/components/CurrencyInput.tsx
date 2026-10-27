@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { formatCurrency } from '../utils/calculations';
+import { cn } from '../lib/utils';
+import { Input } from './ui/input';
 
 interface CurrencyInputProps {
   value: number;
@@ -58,7 +60,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
 
   if (isEditing) {
     return (
-      <input
+      <Input
         ref={inputRef}
         id={id}
         type="number"
@@ -68,7 +70,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
         onKeyDown={handleKeyDown}
         step="0.01"
         min={min}
-        className={`${className} px-3 py-2 border rounded-md text-right`}
+        className={cn('text-right tabular-nums', className)}
         placeholder="0.00"
       />
     );
@@ -78,7 +80,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
     <div
       id={id}
       onClick={() => setIsEditing(true)}
-      className={`${className} px-3 py-2 cursor-pointer hover:bg-accent/50 rounded-md transition-colors text-right font-bold`}
+      className={cn('h-10 px-3 py-2 cursor-pointer hover:bg-accent/50 rounded-lg transition-colors text-right font-bold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', className)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {

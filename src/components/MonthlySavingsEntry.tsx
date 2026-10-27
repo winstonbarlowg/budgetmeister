@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { toast } from 'sonner';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, Pencil, Trash2, PiggyBank, TrendingUp } from 'lucide-react';
 import { MonthData, MoneyMovement } from '../types';
 import { Button } from './ui/button';
@@ -8,9 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { formatCurrency } from '../utils/calculations';
-import { CurrencyInput } from './CurrencyInput';
+import { MoneyInput } from './MoneyInput';
 
 interface MonthlySavingsEntryProps {
   monthData: MonthData;
@@ -18,14 +21,30 @@ interface MonthlySavingsEntryProps {
   onHasChangesChange?: (hasChanges: boolean) => void;
 }
 
-interface MovementFormData {
-  type: 'savings' | 'investment';
-  amount: number;
-  category: string;
-  sourceAccount: string;
-  destinationAccount: string;
-  notes: string;
-}
+const movementSchema = z
+  .object({
+    type: z.enum(['savings', 'investment']),
+    amount: z.number().positive('Enter an amount above zero'),
+    category: z.string().trim().min(1, 'Add a category'),
+    sourceAccount: z.string().trim().min(1, 'Add the account the money comes from'),
+    destinationAccount: z.string().trim().min(1, 'Add the account the money goes to'),
+    notes: z.string(),
+  })
+  .refine(v => v.sourceAccount.trim().toLowerCase() !== v.destinationAccount.trim().toLowerCase(), {
+    path: ['destinationAccount'],
+    message: 'Source and destination must be different accounts',
+  });
+
+type MovementFormData = z.infer<typeof movementSchema>;
+
+const EMPTY_MOVEMENT: MovementFormData = {
+  type: 'savings',
+  amount: 0,
+  category: '',
+  sourceAccount: '',
+  destinationAccount: '',
+  notes: '',
+};
 
 export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
   monthData,
@@ -37,13 +56,9 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
   const [hasChanges, setHasChanges] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<MoneyMovement | null>(null);
-  const [formData, setFormData] = useState<MovementFormData>({
-    type: 'savings',
-    amount: 0,
-    category: '',
-    sourceAccount: '',
-    destinationAccount: '',
-    notes: '',
+  const form = useForm<MovementFormData>({
+    resolver: zodResolver(movementSchema),
+    defaultValues: EMPTY_MOVEMENT,
   });
 
   // Initialize from monthData
@@ -72,20 +87,13 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
 
   const openAddDialog = () => {
     setEditingMovement(null);
-    setFormData({
-      type: 'savings',
-      amount: 0,
-      category: '',
-      sourceAccount: '',
-      destinationAccount: '',
-      notes: '',
-    });
+    form.reset(EMPTY_MOVEMENT);
     setIsDialogOpen(true);
   };
 
   const openEditDialog = (movement: MoneyMovement) => {
     setEditingMovement(movement);
-    setFormData({
+    form.reset({
       type: movement.type,
       amount: movement.amount,
       category: movement.category,
@@ -96,24 +104,26 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = () => {
-    if (!formData.category || !formData.sourceAccount || !formData.destinationAccount || formData.amount <= 0) {
-      toast.error('Please fill in all required fields with valid values');
-      return;
-    }
+  const handleSubmit = (values: MovementFormData) => {
+    const data = {
+      ...values,
+      category: values.category.trim(),
+      sourceAccount: values.sourceAccount.trim(),
+      destinationAccount: values.destinationAccount.trim(),
+    };
 
     if (editingMovement) {
       // Edit existing movement
       const updated: MoneyMovement = {
         ...editingMovement,
-        ...formData,
+        ...data,
       };
       setMovements(movements.map(m => m.id === editingMovement.id ? updated : m));
     } else {
       // Add new movement
       const newMovement: MoneyMovement = {
         id: Date.now().toString(),
-        ...formData,
+        ...data,
       };
       setMovements([...movements, newMovement]);
     }
@@ -302,113 +312,131 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
-            {/* Type selection */}
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <RadioGroup
-                value={formData.type}
-                onValueChange={(value: 'savings' | 'investment') => setFormData({ ...formData, type: value })}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="savings" id="savings" />
-                  <Label htmlFor="savings" className="font-normal cursor-pointer">
-                    <PiggyBank className="inline h-4 w-4 mr-1" />
-                    Savings
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="investment" id="investment" />
-                  <Label htmlFor="investment" className="font-normal cursor-pointer">
-                    <TrendingUp className="inline h-4 w-4 mr-1" />
-                    Investment
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {/* Amount */}
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount *</Label>
-              <CurrencyInput
-                id="amount"
-                value={formData.amount}
-                onChange={(value) => setFormData({ ...formData, amount: value })}
-                className="w-full"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4" noValidate>
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type</FormLabel>
+                    <FormControl>
+                      <RadioGroup value={field.value} onValueChange={field.onChange}>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="savings" id="savings" />
+                          <Label htmlFor="savings" className="font-normal cursor-pointer">
+                            <PiggyBank className="inline h-4 w-4 mr-1" />
+                            Savings
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <RadioGroupItem value="investment" id="investment" />
+                          <Label htmlFor="investment" className="font-normal cursor-pointer">
+                            <TrendingUp className="inline h-4 w-4 mr-1" />
+                            Investment
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </FormControl>
+                  </FormItem>
+                )}
               />
-            </div>
 
-            {/* Category */}
-            <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
-              <Input
-                id="category"
-                list="movement-categories"
-                placeholder="e.g., Emergency Fund, Retirement"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amount</FormLabel>
+                    <FormControl>
+                      <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              <datalist id="movement-categories">
-                {uniqueCategories.map(cat => (
-                  <option key={cat} value={cat} />
-                ))}
-              </datalist>
-            </div>
 
-            {/* Source Account */}
-            <div className="space-y-2">
-              <Label htmlFor="sourceAccount">Source Account *</Label>
-              <Input
-                id="sourceAccount"
-                list="source-accounts"
-                placeholder="e.g., Current Account, Checking"
-                value={formData.sourceAccount}
-                onChange={(e) => setFormData({ ...formData, sourceAccount: e.target.value })}
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <Input list="movement-categories" placeholder="e.g., Emergency Fund, Retirement" {...field} />
+                    </FormControl>
+                    <datalist id="movement-categories">
+                      {uniqueCategories.map(option => (
+                        <option key={option} value={option} />
+                      ))}
+                    </datalist>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              <datalist id="source-accounts">
-                {uniqueSourceAccounts.map(account => (
-                  <option key={account} value={account} />
-                ))}
-              </datalist>
-            </div>
 
-            {/* Destination Account */}
-            <div className="space-y-2">
-              <Label htmlFor="destinationAccount">Destination Account *</Label>
-              <Input
-                id="destinationAccount"
-                list="dest-accounts"
-                placeholder="e.g., Savings Account, ISA"
-                value={formData.destinationAccount}
-                onChange={(e) => setFormData({ ...formData, destinationAccount: e.target.value })}
+              <FormField
+                control={form.control}
+                name="sourceAccount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Source Account</FormLabel>
+                    <FormControl>
+                      <Input list="source-accounts" placeholder="e.g., Current Account, Checking" {...field} />
+                    </FormControl>
+                    <datalist id="source-accounts">
+                      {uniqueSourceAccounts.map(option => (
+                        <option key={option} value={option} />
+                      ))}
+                    </datalist>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              <datalist id="dest-accounts">
-                {uniqueDestAccounts.map(account => (
-                  <option key={account} value={account} />
-                ))}
-              </datalist>
-            </div>
 
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes (optional)</Label>
-              <Input
-                id="notes"
-                placeholder="Add any additional notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              <FormField
+                control={form.control}
+                name="destinationAccount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Destination Account</FormLabel>
+                    <FormControl>
+                      <Input list="dest-accounts" placeholder="e.g., Savings Account, ISA" {...field} />
+                    </FormControl>
+                    <datalist id="dest-accounts">
+                      {uniqueDestAccounts.map(option => (
+                        <option key={option} value={option} />
+                      ))}
+                    </datalist>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSubmit}>
-              {editingMovement ? 'Save Changes' : 'Add Movement'}
-            </Button>
-          </DialogFooter>
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Add any additional notes" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  {editingMovement ? 'Save Changes' : 'Add Movement'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </>

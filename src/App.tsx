@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FolderOpen, Calendar, BarChart3, Settings, TrendingUp, Upload, AlertTriangle } from 'lucide-react';
+import { FolderOpen, Calendar, CalendarRange, BarChart3, Settings, TrendingUp, Upload, AlertTriangle } from 'lucide-react';
 import { SettingsManager } from './components/SettingsManager';
 import { MonthlyEntry } from './components/MonthlyEntry';
 import { Visualizations } from './components/Visualizations';
@@ -13,6 +13,15 @@ import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog';
 import { Toaster } from './components/ui/sonner';
+import { cn } from './lib/utils';
+
+const NAV_ITEMS = [
+  { id: 'monthly', label: 'Monthly Entry', icon: Calendar },
+  { id: 'bank-transactions', label: 'Bank Transactions', icon: Upload },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+  { id: 'yearly', label: 'Yearly Overview', icon: CalendarRange },
+  { id: 'settings', label: 'Settings', icon: Settings },
+];
 
 function App() {
   const [isInitialized, setIsInitialized] = useState(false);
@@ -254,66 +263,19 @@ function App() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
-          <button
-            onClick={() => handleTabChange('monthly')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'monthly'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            }`}
-          >
-            <Calendar className="h-5 w-5" />
-            <span>Monthly Entry</span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange('bank-transactions')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'bank-transactions'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            }`}
-          >
-            <Upload className="h-5 w-5" />
-            <span>Bank Transactions</span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange('analytics')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'analytics'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            }`}
-          >
-            <BarChart3 className="h-5 w-5" />
-            <span>Analytics</span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange('yearly')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'yearly'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            }`}
-          >
-            <Calendar className="h-5 w-5" />
-            <span>Yearly Overview</span>
-          </button>
-
-          <button
-            onClick={() => handleTabChange('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === 'settings'
-                ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            }`}
-          >
-            <Settings className="h-5 w-5" />
-            <span>Settings</span>
-          </button>
+        <nav className="flex-1 p-4 space-y-1">
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+            <Button
+              key={id}
+              variant={activeTab === id ? 'default' : 'ghost'}
+              className={cn('w-full justify-start gap-3 h-11', activeTab !== id && 'text-muted-foreground')}
+              onClick={() => handleTabChange(id)}
+              aria-current={activeTab === id ? 'page' : undefined}
+            >
+              <Icon className="h-5 w-5" />
+              {label}
+            </Button>
+          ))}
         </nav>
       </aside>
 

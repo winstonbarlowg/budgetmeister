@@ -4,6 +4,7 @@ import { BudgetConfig, CategorizedTransaction, ImportSession } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
+import { Label } from './ui/label';
 import { useConfirm } from './ui/confirm-dialog';
 import { TransactionUpload } from './TransactionUpload';
 import { TransactionSummary } from './TransactionSummary';
@@ -293,9 +294,9 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
                 checked={ignoreDuplicates}
                 onCheckedChange={(checked) => setIgnoreDuplicates(checked === true)}
               />
-              <label htmlFor="ignore-duplicates" className="text-sm font-medium cursor-pointer flex-1">
+              <Label htmlFor="ignore-duplicates" className="cursor-pointer flex-1">
                 Ignore duplicate transactions when applying to monthly expenses
-              </label>
+              </Label>
               <span className="text-xs text-muted-foreground">
                 {importedTransactions.filter(t => t.isDuplicate).length} duplicates will be excluded
               </span>

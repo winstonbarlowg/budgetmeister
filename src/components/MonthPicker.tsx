@@ -94,6 +94,8 @@ interface MonthPickerFieldProps {
   placeholder?: string;
   clearable?: boolean;
   className?: string;
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
 }
 
 const toYearMonth = (year: number, month: number) => `${year}-${month.toString().padStart(2, '0')}`;
@@ -106,6 +108,7 @@ export const MonthPickerField: React.FC<MonthPickerFieldProps> = ({
   placeholder = 'Pick a month',
   clearable = false,
   className,
+  ...ariaProps
 }) => {
   const [open, setOpen] = useState(false);
   const selected = value ? { year: parseInt(value.slice(0, 4)), month: parseInt(value.slice(5, 7)) } : null;
@@ -123,7 +126,12 @@ export const MonthPickerField: React.FC<MonthPickerFieldProps> = ({
           id={id}
           type="button"
           variant="outline"
-          className={cn('w-full justify-start font-normal', !selected && 'text-muted-foreground', className)}
+          className={cn(
+            'w-full justify-start font-normal aria-[invalid=true]:border-destructive',
+            !selected && 'text-muted-foreground',
+            className
+          )}
+          {...ariaProps}
         >
           <CalendarDays className="h-4 w-4 opacity-60" />
           {selected ? `${getMonthName(selected.month)} ${selected.year}` : placeholder}

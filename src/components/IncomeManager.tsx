@@ -1,14 +1,18 @@
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Plus, Edit2, Trash2, Calendar } from 'lucide-react';
 import { IncomeSource } from '../types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { useConfirm } from './ui/confirm-dialog';
 import { MonthPickerField } from './MonthPicker';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
+import { MoneyInput } from './MoneyInput';
 import { formatCurrency, validateIncomeAmounts } from '../utils/calculations';
 
 interface IncomeManagerProps {
@@ -23,44 +27,55 @@ const PRESET_COLORS = [
   '#8b5cf6', '#a855f7', '#d946ef', '#ec4899',
 ];
 
+const incomeSchema = z
+  .object({
+    name: z.string().trim().min(1, 'Give this income source a name'),
+    color: z.string(),
+    startDate: z.string().min(1, 'Choose a start month'),
+    endDate: z.string(),
+    defaultGross: z.number().min(0, 'Must be zero or more'),
+    defaultPension: z.number().min(0, 'Must be zero or more'),
+    defaultNI: z.number().min(0, 'Must be zero or more'),
+    defaultTax: z.number().min(0, 'Must be zero or more'),
+    defaultNet: z.number().min(0, 'Must be zero or more'),
+  })
+  .refine(v => !v.endDate || v.endDate >= v.startDate, {
+    path: ['endDate'],
+    message: 'End month must be on or after the start month',
+  });
+
+type IncomeFormValues = z.infer<typeof incomeSchema>;
+
+const emptyForm = (): IncomeFormValues => ({
+  name: '',
+  color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
+  startDate: new Date().toISOString().slice(0, 7),
+  endDate: '',
+  defaultGross: 0,
+  defaultPension: 0,
+  defaultNI: 0,
+  defaultTax: 0,
+  defaultNet: 0,
+});
+
 export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onSave }) => {
   const confirm = useConfirm();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    color: PRESET_COLORS[0],
-    startDate: '',
-    endDate: '',
-    defaultGross: 0,
-    defaultPension: 0,
-    defaultNI: 0,
-    defaultTax: 0,
-    defaultNet: 0,
+  const form = useForm<IncomeFormValues>({
+    resolver: zodResolver(incomeSchema),
+    defaultValues: emptyForm(),
   });
-  const [validationWarning, setValidationWarning] = useState('');
 
   const handleAdd = () => {
-    const currentYearMonth = new Date().toISOString().slice(0, 7);
     setEditingSource(null);
-    setFormData({
-      name: '',
-      color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
-      startDate: currentYearMonth,
-      endDate: '',
-      defaultGross: 0,
-      defaultPension: 0,
-      defaultNI: 0,
-      defaultTax: 0,
-      defaultNet: 0,
-    });
-    setValidationWarning('');
+    form.reset(emptyForm());
     setIsModalOpen(true);
   };
 
   const handleEdit = (source: IncomeSource) => {
     setEditingSource(source);
-    setFormData({
+    form.reset({
       name: source.name,
       color: source.color || PRESET_COLORS[0],
       startDate: source.startDate,
@@ -71,7 +86,6 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
       defaultTax: source.defaultTax,
       defaultNet: source.defaultNet,
     });
-    setValidationWarning('');
     setIsModalOpen(true);
   };
 
@@ -87,56 +101,22 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
     }
   };
 
-  const validateForm = (): boolean => {
-    // Validate dates
-    if (!formData.startDate) {
-      setValidationWarning('Choose a start month');
-      return false;
-    }
-    if (formData.endDate && formData.endDate < formData.startDate) {
-      setValidationWarning('End date must be after start date');
-      return false;
-    }
+  // Net that doesn't add up is a warning, not an error
+  const [gross, pension, ni, tax, net] = form.watch(['defaultGross', 'defaultPension', 'defaultNI', 'defaultTax', 'defaultNet']);
+  const amountCheck = validateIncomeAmounts(gross, pension, ni, tax, net);
 
-    // Validate amounts
-    const validation = validateIncomeAmounts(
-      formData.defaultGross,
-      formData.defaultPension,
-      formData.defaultNI,
-      formData.defaultTax,
-      formData.defaultNet
-    );
-
-    if (!validation.isValid) {
-      setValidationWarning(
-        `Warning: Net amount should be ${formatCurrency(validation.expectedNet)} based on deductions`
-      );
-      // Don't block saving, just warn
-    } else {
-      setValidationWarning('');
-    }
-
-    return true;
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
+  const handleSubmit = (values: IncomeFormValues) => {
     const newSource: IncomeSource = {
-      id: editingSource?.id || formData.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
-      name: formData.name,
-      color: formData.color,
-      startDate: formData.startDate,
-      endDate: formData.endDate || null,
-      defaultGross: formData.defaultGross,
-      defaultPension: formData.defaultPension,
-      defaultNI: formData.defaultNI,
-      defaultTax: formData.defaultTax,
-      defaultNet: formData.defaultNet,
+      id: editingSource?.id || values.name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+      name: values.name.trim(),
+      color: values.color,
+      startDate: values.startDate,
+      endDate: values.endDate || null,
+      defaultGross: values.defaultGross,
+      defaultPension: values.defaultPension,
+      defaultNI: values.defaultNI,
+      defaultTax: values.defaultTax,
+      defaultNet: values.defaultNet,
     };
 
     if (editingSource) {
@@ -276,137 +256,141 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4" noValidate>
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Income Source Name</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Main Salary, Freelance, Benefits" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2 col-span-2">
-                <Label htmlFor="name">Income Source Name</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Main Salary, Freelance, Benefits"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="startDate">Start Month</Label>
-                <MonthPickerField
-                  id="startDate"
-                  value={formData.startDate}
-                  onChange={(startDate) => setFormData({ ...formData, startDate })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="endDate">End Month (Optional)</Label>
-                <MonthPickerField
-                  id="endDate"
-                  value={formData.endDate}
-                  onChange={(endDate) => setFormData({ ...formData, endDate })}
-                  placeholder="Ongoing"
-                  clearable
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Month</FormLabel>
+                    <FormControl>
+                      <MonthPickerField value={field.value} onChange={field.onChange} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Month (Optional)</FormLabel>
+                    <FormControl>
+                      <MonthPickerField value={field.value} onChange={field.onChange} placeholder="Ongoing" clearable />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <div className="space-y-3 rounded-lg border p-4">
               <h4 className="font-semibold">Monthly Income Breakdown</h4>
 
-              <div className="space-y-2">
-                <Label htmlFor="gross">Gross Income</Label>
-                <Input
-                  id="gross"
-                  type="number"
-                  value={formData.defaultGross}
-                  onChange={(e) =>
-                    setFormData({ ...formData, defaultGross: parseFloat(e.target.value) || 0 })
-                  }
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  required
-                />
-              </div>
+                  <FormField
+                    control={form.control}
+                    name="defaultGross"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gross Income</FormLabel>
+                        <FormControl>
+                          <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
               <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="pension">Pension</Label>
-                  <Input
-                    id="pension"
-                    type="number"
-                    value={formData.defaultPension}
-                    onChange={(e) =>
-                      setFormData({ ...formData, defaultPension: parseFloat(e.target.value) || 0 })
-                    }
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
+                  <FormField
+                    control={form.control}
+                    name="defaultPension"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Pension</FormLabel>
+                        <FormControl>
+                          <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="ni">National Insurance</Label>
-                  <Input
-                    id="ni"
-                    type="number"
-                    value={formData.defaultNI}
-                    onChange={(e) =>
-                      setFormData({ ...formData, defaultNI: parseFloat(e.target.value) || 0 })
-                    }
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
+                  <FormField
+                    control={form.control}
+                    name="defaultNI"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>National Insurance</FormLabel>
+                        <FormControl>
+                          <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="tax">Tax</Label>
-                  <Input
-                    id="tax"
-                    type="number"
-                    value={formData.defaultTax}
-                    onChange={(e) =>
-                      setFormData({ ...formData, defaultTax: parseFloat(e.target.value) || 0 })
-                    }
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
+                  <FormField
+                    control={form.control}
+                    name="defaultTax"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tax</FormLabel>
+                        <FormControl>
+                          <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
-                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="net">Net Take-Home Pay</Label>
-                <Input
-                  id="net"
-                  type="number"
-                  value={formData.defaultNet}
-                  onChange={(e) =>
-                    setFormData({ ...formData, defaultNet: parseFloat(e.target.value) || 0 })
-                  }
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                  required
-                />
-              </div>
+                  <FormField
+                    control={form.control}
+                    name="defaultNet"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Net Take-Home Pay</FormLabel>
+                        <FormControl>
+                          <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              {validationWarning && (
+              {!amountCheck.isValid && (
                 <div className="rounded-md bg-warning/10 p-3 text-sm text-warning">
-                  {validationWarning}
+                  Net would normally be {formatCurrency(amountCheck.expectedNet)} after these deductions. You can still save.
                 </div>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>Color</Label>
-              <ColorSwatchPicker
-                colors={PRESET_COLORS}
-                value={formData.color}
-                onChange={(color) => setFormData({ ...formData, color })}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Color</FormLabel>
+                  <ColorSwatchPicker colors={PRESET_COLORS} value={field.value} onChange={field.onChange} />
+                </FormItem>
+              )}
+            />
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
@@ -417,6 +401,7 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
               </Button>
             </DialogFooter>
           </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </>
