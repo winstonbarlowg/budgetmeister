@@ -10,8 +10,7 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
-  Legend,
+  Label as ChartLabel,
 } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -69,111 +68,71 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
 
   const selectedMonth = yearData[selectedMonthIndex] || currentMonth;
 
-  // Modern diverse fintech color palette - solid yet approachable
-  const chartColors = [
-    '#60a5fa', // blue-400 - medium blue
-    '#34d399', // emerald-400 - teal green
-    '#f472b6', // pink-400 - magenta
-    '#fbbf24', // amber-400 - gold
-    '#a78bfa', // violet-400 - purple
-    '#22d3ee', // cyan-400 - turquoise
-    '#fb923c', // orange-400 - coral
-    '#818cf8', // indigo-400 - indigo
-    '#fb7185', // rose-400 - rose
-    '#4ade80', // green-400 - lime
-    '#38bdf8', // sky-400 - light blue
-    '#c084fc', // purple-400 - orchid
-  ];
+  // Category slices use each category's colour from Settings, falling back to the theme chart colours
+  const fallbackColors = [1, 2, 3, 4, 5].map((n) => `hsl(var(--chart-${n}))`);
+
+  // Fixed and Variable use the same colours in every chart
+  const fixedVariableConfig = {
+    Fixed: { label: 'Fixed', color: 'hsl(var(--chart-1))' },
+    Variable: { label: 'Variable', color: 'hsl(var(--chart-2))' },
+  } satisfies ChartConfig;
 
   // 1. Monthly Budget vs Actual Bar Chart
   const budgetVsActualData = [
-    {
-      name: 'Budget',
-      Fixed: selectedMonth.fixedBudget,
-      Variable: selectedMonth.variableBudget,
-    },
-    {
-      name: 'Actual',
-      Fixed: selectedMonth.fixedActual,
-      Variable: selectedMonth.variableActual,
-    },
+    { name: 'Budget', Fixed: selectedMonth.fixedBudget, Variable: selectedMonth.variableBudget },
+    { name: 'Actual', Fixed: selectedMonth.fixedActual, Variable: selectedMonth.variableActual },
   ];
-
-  const budgetVsActualConfig = {
-    Fixed: {
-      label: "Fixed Expenses",
-      color: "#fb7185", // rose-400 - rose
-    },
-    Variable: {
-      label: "Variable Expenses",
-      color: "#60a5fa", // blue-400 - medium blue
-    },
-  } satisfies ChartConfig;
 
   // 2. Spending by Category (Donut Chart)
   const categorySpendingData = selectedMonth.categories
     .filter((c) => c.actualAmount > 0)
-    .sort((a, b) => b.actualAmount - a.actualAmount) // Sort by amount for better organization
-    .map((c, index) => ({
-      name: c.name,
-      value: c.actualAmount,
-      id: c.id,
-      fill: chartColors[index % chartColors.length],
-    }));
+    .sort((a, b) => b.actualAmount - a.actualAmount)
+    .map((c, index) => ({ key: `cat${index}`, name: c.name, value: c.actualAmount, fill: `var(--color-cat${index})` }));
 
-  const categoryConfig = categorySpendingData.reduce((acc, cat) => ({
-    ...acc,
-    [cat.id]: {
-      label: cat.name,
-      color: cat.fill,
-    }
-  }), {}) satisfies ChartConfig;
+  const categoryConfig: ChartConfig = Object.fromEntries(
+    selectedMonth.categories
+      .filter((c) => c.actualAmount > 0)
+      .sort((a, b) => b.actualAmount - a.actualAmount)
+      .map((c, index) => [`cat${index}`, { label: c.name, color: c.color || fallbackColors[index % fallbackColors.length] }])
+  );
 
   // 3. Fixed vs Variable Split (Pie)
   const fixedVsVariableData = [
-    { name: 'Fixed', value: selectedMonth.fixedActual },
-    { name: 'Variable', value: selectedMonth.variableActual },
+    { key: 'Fixed', value: selectedMonth.fixedActual, fill: 'var(--color-Fixed)' },
+    { key: 'Variable', value: selectedMonth.variableActual, fill: 'var(--color-Variable)' },
   ];
 
-  const fixedVsVariableConfig = {
-    Fixed: {
-      label: "Fixed Expenses",
-      color: "#fb7185", // rose-400 - rose
-    },
-    Variable: {
-      label: "Variable Expenses",
-      color: "#60a5fa", // blue-400 - medium blue
-    },
-  } satisfies ChartConfig;
-
-  // 4. Monthly Trend Line
+  // 4. Monthly Trend Line (months with no spending yet leave a gap rather than dropping to £0)
   const monthlyTrendData = yearData.map((month) => ({
     month: getMonthShortName(month.month),
     budget: month.totalBudget,
-    actual: month.totalActual,
+    actual: month.totalActual > 0 ? month.totalActual : null,
   }));
 
   const trendConfig = {
-    budget: {
-      label: "Budget",
-      color: "#9ca3af", // gray-400 - medium gray
-    },
-    actual: {
-      label: "Actual",
-      color: "#60a5fa", // blue-400 - medium blue
-    },
+    budget: { label: 'Budget', color: 'hsl(var(--muted-foreground))' },
+    actual: { label: 'Actual', color: 'hsl(var(--info))' },
   } satisfies ChartConfig;
 
-  // 5. Variance Waterfall (simplified as bar chart showing variance per category)
-  // Only show variable expenses since fixed expenses are expected to have no variance
+  // 5. Variance per variable category (fixed expenses are expected to match their budget)
   const varianceData = selectedMonth.categories
     .filter((c) => c.type === 'variable')
     .map((c) => ({
       name: c.name,
       variance: c.variance,
-      color: c.variance > 0 ? '#fb7185' : '#34d399', // rose-400 for over, emerald-400 for under
+      fill: c.variance > 0 ? 'var(--color-over)' : 'var(--color-under)',
     }))
     .sort((a, b) => b.variance - a.variance);
+
+  const varianceConfig = {
+    variance: { label: 'Variance' },
+    over: { label: 'Over budget', color: 'hsl(var(--destructive))' },
+    under: { label: 'Under budget', color: 'hsl(var(--success))' },
+  } satisfies ChartConfig;
+
+  const formatSignedCurrency = (value: number) => `${value > 0 ? '+' : ''}${formatCurrency(value)}`;
+  const formatAxisCurrency = (value: number) =>
+    new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', notation: 'compact', maximumFractionDigits: 1 }).format(value);
 
   // 6. YTD Progress
   const ytdBudget = yearData.reduce((sum, m) => sum + m.totalBudget, 0);
@@ -264,12 +223,12 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
             <CardDescription>{getMonthName(selectedMonth.month)} {selectedMonth.year}</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={budgetVsActualConfig} className="min-h-[300px] w-full">
-              <BarChart data={budgetVsActualData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis tickFormatter={formatCurrency} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
+            <ChartContainer config={fixedVariableConfig} className="min-h-[300px] w-full">
+              <BarChart accessibilityLayer data={budgetVsActualData}>
+                <CartesianGrid vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} />
+                <YAxis tickLine={false} axisLine={false} tickFormatter={formatAxisCurrency} width={60} />
+                <ChartTooltip content={<ChartTooltipContent valueFormatter={formatCurrency} />} />
                 <ChartLegend content={<ChartLegendContent />} />
                 <Bar dataKey="Fixed" fill="var(--color-Fixed)" radius={4} />
                 <Bar dataKey="Variable" fill="var(--color-Variable)" radius={4} />
@@ -285,38 +244,38 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
             <CardDescription>{getMonthName(selectedMonth.month)} {selectedMonth.year}</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={categoryConfig} className="min-h-[300px] w-full">
-              <PieChart>
-                <Tooltip
-                  formatter={(value: number, name: string) => [formatCurrency(value), name]}
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    padding: '8px 12px',
-                  }}
-                />
-                <Pie
-                  data={categorySpendingData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={60}
-                  outerRadius={100}
-                  strokeWidth={2}
-                  stroke="#fff"
-                >
-                  {categorySpendingData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Legend
-                  layout="vertical"
-                  align="right"
-                  verticalAlign="middle"
-                  wrapperStyle={{ paddingLeft: '20px', fontSize: '12px' }}
-                />
-              </PieChart>
-            </ChartContainer>
+            {categorySpendingData.length === 0 ? (
+              <p className="flex min-h-[300px] items-center justify-center text-sm text-muted-foreground">
+                No spending recorded this month.
+              </p>
+            ) : (
+              <ChartContainer config={categoryConfig} className="mx-auto aspect-square max-h-[380px] w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent nameKey="key" hideLabel valueFormatter={formatCurrency} />} />
+                  <Pie data={categorySpendingData} dataKey="value" nameKey="key" innerRadius={70} outerRadius={110} strokeWidth={2}>
+                    <ChartLabel
+                      content={({ viewBox }) => {
+                        if (!viewBox || !('cx' in viewBox)) return null;
+                        return (
+                          <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
+                            <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-lg font-bold">
+                              {formatCurrency(selectedMonth.totalActual)}
+                            </tspan>
+                            <tspan x={viewBox.cx} y={(viewBox.cy || 0) + 22} className="fill-muted-foreground text-xs">
+                              Spent
+                            </tspan>
+                          </text>
+                        );
+                      }}
+                    />
+                  </Pie>
+                  <ChartLegend
+                    content={<ChartLegendContent nameKey="key" />}
+                    className="flex-wrap gap-x-3 gap-y-1 text-xs"
+                  />
+                </PieChart>
+              </ChartContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -327,34 +286,11 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
             <CardDescription>{getMonthName(selectedMonth.month)} {selectedMonth.year}</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={fixedVsVariableConfig} className="min-h-[300px] w-full">
+            <ChartContainer config={fixedVariableConfig} className="mx-auto aspect-square max-h-[300px] w-full">
               <PieChart>
-                <Tooltip
-                  formatter={(value: number, name: string) => [formatCurrency(value), name]}
-                  contentStyle={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: '6px',
-                    padding: '8px 12px',
-                  }}
-                />
-                <Pie
-                  data={fixedVsVariableData}
-                  dataKey="value"
-                  nameKey="name"
-                  outerRadius={100}
-                  strokeWidth={2}
-                  stroke="#fff"
-                >
-                  <Cell fill="#dc2626" />
-                  <Cell fill="#2563eb" />
-                </Pie>
-                <Legend
-                  layout="vertical"
-                  align="right"
-                  verticalAlign="middle"
-                  wrapperStyle={{ paddingLeft: '20px' }}
-                />
+                <ChartTooltip content={<ChartTooltipContent nameKey="key" hideLabel valueFormatter={formatCurrency} />} />
+                <Pie data={fixedVsVariableData} dataKey="value" nameKey="key" outerRadius={100} strokeWidth={2} />
+                <ChartLegend content={<ChartLegendContent nameKey="key" />} />
               </PieChart>
             </ChartContainer>
           </CardContent>
@@ -367,15 +303,20 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
             <CardDescription>Track spending variance for variable categories - {getMonthName(selectedMonth.month)} {selectedMonth.year}</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={{}} className="min-h-[400px] w-full">
-              <BarChart data={varianceData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" tickFormatter={formatCurrency} />
-                <YAxis dataKey="name" type="category" width={120} />
-                <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
+            {/* One row per category so every name gets a label */}
+            <ChartContainer
+              config={varianceConfig}
+              className="aspect-auto w-full"
+              style={{ height: Math.max(300, varianceData.length * 32) }}
+            >
+              <BarChart accessibilityLayer data={varianceData} layout="vertical">
+                <CartesianGrid horizontal={false} />
+                <XAxis type="number" tickLine={false} axisLine={false} tickFormatter={formatAxisCurrency} />
+                <YAxis dataKey="name" type="category" tickLine={false} axisLine={false} width={120} interval={0} />
+                <ChartTooltip content={<ChartTooltipContent valueFormatter={formatSignedCurrency} />} />
                 <Bar dataKey="variance" radius={4}>
-                  {varianceData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  {varianceData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
                   ))}
                 </Bar>
               </BarChart>
@@ -432,14 +373,14 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
         </CardHeader>
         <CardContent>
           <ChartContainer config={trendConfig} className="min-h-[300px] w-full">
-            <LineChart data={monthlyTrendData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis tickFormatter={formatCurrency} />
-              <ChartTooltip content={<ChartTooltipContent formatter={(value) => formatCurrency(value as number)} />} />
+            <LineChart accessibilityLayer data={monthlyTrendData}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="month" tickLine={false} axisLine={false} tickMargin={10} />
+              <YAxis tickLine={false} axisLine={false} tickFormatter={formatAxisCurrency} width={60} />
+              <ChartTooltip content={<ChartTooltipContent indicator="line" valueFormatter={formatCurrency} />} />
               <ChartLegend content={<ChartLegendContent />} />
-              <Line type="monotone" dataKey="budget" stroke="var(--color-budget)" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="actual" stroke="var(--color-actual)" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="budget" stroke="var(--color-budget)" strokeWidth={2} strokeDasharray="4 4" dot={false} />
+              <Line type="monotone" dataKey="actual" stroke="var(--color-actual)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-actual)' }} />
             </LineChart>
           </ChartContainer>
         </CardContent>
