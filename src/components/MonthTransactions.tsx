@@ -21,7 +21,6 @@ interface MonthTransactionsProps {
   categories: Category[];
   monthData: MonthData;
   onSave: (data: MonthData) => Promise<void>;
-  disabled?: boolean;
 }
 
 const ACCOUNT_BADGE_STYLES: Record<string, string> = {
@@ -35,7 +34,6 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
   categories,
   monthData,
   onSave,
-  disabled = false,
 }) => {
   const [accountFilter, setAccountFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -85,11 +83,6 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
           {transactions.length} transactions in {getMonthName(monthData.month)} {monthData.year} •{' '}
           {formatCurrency(countedTotal)} counted towards expenses • {excludedCount} excluded
         </CardDescription>
-        {disabled && (
-          <p className="text-sm text-warning font-medium pt-1">
-            Save your expense changes above before editing transactions.
-          </p>
-        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Filters */}
@@ -162,7 +155,6 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
               >
                 <Checkbox
                   checked={!transaction.excluded}
-                  disabled={disabled}
                   onCheckedChange={checked => handleIncludeToggle(transaction, checked === true)}
                   title={transaction.excluded ? 'Click to include in expenses' : 'Click to exclude from expenses'}
                 />
@@ -197,7 +189,7 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
                 <Select
                   value={transaction.categoryId || ''}
                   onValueChange={value => handleCategoryChange(transaction, value)}
-                  disabled={disabled || transaction.excluded}
+                  disabled={transaction.excluded}
                 >
                   <SelectTrigger className="w-[180px] shrink-0">
                     <SelectValue placeholder="Choose category" />
