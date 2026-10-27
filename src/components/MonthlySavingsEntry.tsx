@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,7 +18,6 @@ import { MoneyInput } from './MoneyInput';
 interface MonthlySavingsEntryProps {
   monthData: MonthData;
   onSave: (data: MonthData) => void;
-  onHasChangesChange?: (hasChanges: boolean) => void;
 }
 
 const movementSchema = z
@@ -49,11 +48,9 @@ const EMPTY_MOVEMENT: MovementFormData = {
 export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
   monthData,
   onSave,
-  onHasChangesChange,
 }) => {
   const confirm = useConfirm();
-  const [movements, setMovements] = useState<MoneyMovement[]>([]);
-  const [hasChanges, setHasChanges] = useState(false);
+  const movements = monthData.moneyMovements || [];
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMovement, setEditingMovement] = useState<MoneyMovement | null>(null);
   const form = useForm<MovementFormData>({
@@ -61,15 +58,10 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
     defaultValues: EMPTY_MOVEMENT,
   });
 
-  // Initialize from monthData
-  useEffect(() => {
-    setMovements(monthData.moneyMovements || []);
-    setHasChanges(false);
-  }, [monthData]);
-
-  useEffect(() => {
-    onHasChangesChange?.(hasChanges);
-  }, [hasChanges]);
+  // Every add, edit and delete is saved straight away
+  const saveMovements = (updated: MoneyMovement[]) => {
+    onSave({ ...monthData, moneyMovements: updated });
+  };
 
   // Calculate totals
   const totalSavings = movements
@@ -118,17 +110,16 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
         ...editingMovement,
         ...data,
       };
-      setMovements(movements.map(m => m.id === editingMovement.id ? updated : m));
+      saveMovements(movements.map(m => m.id === editingMovement.id ? updated : m));
     } else {
       // Add new movement
       const newMovement: MoneyMovement = {
         id: Date.now().toString(),
         ...data,
       };
-      setMovements([...movements, newMovement]);
+      saveMovements([...movements, newMovement]);
     }
 
-    setHasChanges(true);
     setIsDialogOpen(false);
   };
 
@@ -140,14 +131,8 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
       destructive: true,
     });
     if (confirmed) {
-      setMovements(movements.filter(m => m.id !== id));
-      setHasChanges(true);
+      saveMovements(movements.filter(m => m.id !== id));
     }
-  };
-
-  const handleSave = () => {
-    onSave({ ...monthData, moneyMovements: movements });
-    setHasChanges(false);
   };
 
   const savingsMovements = movements.filter(m => m.type === 'savings');
@@ -282,7 +267,7 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
               )}
 
               {/* Totals footer */}
-              <div className="border-t pt-4 flex justify-between items-center">
+              <div className="border-t pt-4">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Total Savings:</span>{' '}
                   <span className="font-semibold text-success">{formatCurrency(totalSavings)}</span>
@@ -293,9 +278,6 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
                   <span className="text-muted-foreground">Total:</span>{' '}
                   <span className="font-bold">{formatCurrency(totalSavings + totalInvestments)}</span>
                 </div>
-                <Button onClick={handleSave} disabled={!hasChanges}>
-                  Save Changes
-                </Button>
               </div>
             </>
           )}

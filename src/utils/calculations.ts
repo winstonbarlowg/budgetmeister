@@ -31,18 +31,19 @@ export function calculateMonthSummary(
   const variableActual = variableCategories.reduce((sum, c) => sum + c.actualAmount, 0);
 
   // Income calculations
-  const incomeWithSource: IncomeWithSource[] = (monthData.income || []).map(income => {
-    const source = config.incomeSources.find(s => s.id === income.sourceId);
+  const income = getEffectiveIncome(config.incomeSources, monthData);
+  const incomeWithSource: IncomeWithSource[] = income.map(entry => {
+    const source = config.incomeSources.find(s => s.id === entry.sourceId);
     return {
-      ...income,
+      ...entry,
       sourceName: source?.name || 'Unknown',
       sourceColor: source?.color
     };
   });
 
-  const totalIncomeGross = (monthData.income || []).reduce((sum, i) => sum + i.gross, 0);
-  const totalIncomeNet = (monthData.income || []).reduce((sum, i) => sum + i.net, 0);
-  const totalDeductions = (monthData.income || []).reduce(
+  const totalIncomeGross = income.reduce((sum, i) => sum + i.gross, 0);
+  const totalIncomeNet = income.reduce((sum, i) => sum + i.net, 0);
+  const totalDeductions = income.reduce(
     (sum, i) => sum + i.pension + i.nationalInsurance + i.tax,
     0
   );
@@ -123,6 +124,21 @@ export function getSuggestedIncome(
       tax: source.defaultTax,
       net: source.defaultNet
     }));
+}
+
+/**
+ * Income for a month: amounts saved for that month win, and any active source
+ * with nothing saved falls back to its defaults from Settings.
+ */
+export function getEffectiveIncome(
+  incomeSources: IncomeSource[],
+  monthData: Pick<MonthData, 'year' | 'month' | 'income'>
+): MonthlyIncome[] {
+  const saved = monthData.income || [];
+  const savedIds = new Set(saved.map(i => i.sourceId));
+  const defaults = getSuggestedIncome(incomeSources, monthData.year, monthData.month)
+    .filter(s => !savedIds.has(s.sourceId));
+  return [...saved, ...defaults];
 }
 
 export function validateIncomeAmounts(

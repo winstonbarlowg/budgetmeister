@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Save, TrendingDown, TrendingUp, DollarSign, RefreshCw, CalendarCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, RefreshCw, CalendarCheck } from 'lucide-react';
 import { MonthData, Category, MonthSummary, BudgetConfig, IncomeSource, MonthlyExpense } from '../types';
 import { calculateMonthSummary, formatCurrency, normalizeExpense, updateExpenseAmount, getMinimumExpenseAmount } from '../utils/calculations';
 import { Button } from './ui/button';
@@ -18,7 +18,6 @@ interface MonthlyEntryProps {
   monthData: MonthData;
   onSave: (data: MonthData) => void;
   onMonthChange: (year: number, month: number) => void;
-  onHasChangesChange?: (hasChanges: boolean) => void;
 }
 
 export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
@@ -28,13 +27,9 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   monthData,
   onSave,
   onMonthChange,
-  onHasChangesChange,
 }) => {
   const [expenses, setExpenses] = useState<{ [categoryId: string]: number }>({});
   const [expenseDetails, setExpenseDetails] = useState<{ [categoryId: string]: MonthlyExpense }>({});
-  const [hasChanges, setHasChanges] = useState(false);
-  const [incomeHasChanges, setIncomeHasChanges] = useState(false);
-  const [savingsHasChanges, setSavingsHasChanges] = useState(false);
 
   useEffect(() => {
     const expenseMap: { [categoryId: string]: number } = {};
@@ -48,12 +43,25 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
 
     setExpenses(expenseMap);
     setExpenseDetails(detailsMap);
-    setHasChanges(false);
   }, [monthData]);
 
-  useEffect(() => {
-    onHasChangesChange?.(hasChanges || incomeHasChanges || savingsHasChanges);
-  }, [hasChanges, incomeHasChanges, savingsHasChanges]);
+  // Every edit is saved straight away
+  const saveExpenses = (updatedExpenses: { [categoryId: string]: number }) => {
+    setExpenses(updatedExpenses);
+    onSave({
+      ...monthData,
+      expenses: categories.map((category) => {
+        const currentDetail = expenseDetails[category.id] || {
+          categoryId: category.id,
+          actualAmount: 0,
+          importedAmount: 0,
+          manualAmount: 0,
+          linkedTransactionIds: []
+        };
+        return updateExpenseAmount(currentDetail, updatedExpenses[category.id] || 0);
+      }),
+    });
+  };
 
   const handleExpenseChange = (categoryId: string, amount: number) => {
     const currentDetail = expenseDetails[categoryId] || {
@@ -67,8 +75,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
     const minimum = getMinimumExpenseAmount(currentDetail);
     const safeAmount = Math.max(amount, minimum);
 
-    setExpenses({ ...expenses, [categoryId]: safeAmount });
-    setHasChanges(true);
+    saveExpenses({ ...expenses, [categoryId]: safeAmount });
   };
 
   const handleApplyFixedDefaults = () => {
@@ -78,29 +85,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
       .forEach(cat => {
         updatedExpenses[cat.id] = cat.budgetAmount;
       });
-    setExpenses(updatedExpenses);
-    setHasChanges(true);
-  };
-
-  const handleSave = () => {
-    const updatedExpenses = categories.map((category) => {
-      const currentDetail = expenseDetails[category.id] || {
-        categoryId: category.id,
-        actualAmount: 0,
-        importedAmount: 0,
-        manualAmount: 0,
-        linkedTransactionIds: []
-      };
-
-      const newActualAmount = expenses[category.id] || 0;
-      return updateExpenseAmount(currentDetail, newActualAmount);
-    });
-
-    onSave({
-      ...monthData,
-      expenses: updatedExpenses,
-    });
-    setHasChanges(false);
+    saveExpenses(updatedExpenses);
   };
 
   const handlePrevMonth = () => {
@@ -165,27 +150,22 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
       {/* Month Navigation */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <MonthPicker year={monthData.year} month={monthData.month} onSelect={onMonthChange} />
-                <CardDescription className="mt-1.5">Enter your expenses for this month</CardDescription>
-              </div>
-              <Button variant="outline" size="icon" onClick={handleNextMonth}>
-                <ChevronRight className="h-5 w-5" />
-              </Button>
-              {!isCurrentMonth && (
-                <Button variant="outline" onClick={handleCurrentMonth}>
-                  <CalendarCheck className="h-4 w-4" /> This month
-                </Button>
-              )}
-            </div>
-            <Button onClick={handleSave} disabled={!hasChanges} size="lg" variant="success">
-              <Save className="h-5 w-5" /> Save Changes
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ChevronLeft className="h-5 w-5" />
             </Button>
+            <div>
+              <MonthPicker year={monthData.year} month={monthData.month} onSelect={onMonthChange} />
+              <CardDescription className="mt-1.5">Enter your expenses for this month. Changes save automatically.</CardDescription>
+            </div>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+            {!isCurrentMonth && (
+              <Button variant="outline" onClick={handleCurrentMonth}>
+                <CalendarCheck className="h-4 w-4" /> This month
+              </Button>
+            )}
           </div>
         </CardHeader>
       </Card>
@@ -254,14 +234,6 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
             <p className="text-sm text-muted-foreground mb-1">
               Income - Expenses
             </p>
-            {monthData.income?.length === 0 && incomeSources.length > 0 && (
-              <p className="text-xs text-warning font-medium flex items-center gap-1 mt-2">
-                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                Income not saved - scroll down to save your monthly income
-              </p>
-            )}
             {summary.totalMoneyMovements > 0 && (
               <div className="mt-3 pt-3 border-t border-highlight/30">
                 <p className="text-xs text-muted-foreground">After Savings & Investments:</p>
@@ -287,7 +259,6 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
             year={monthData.year}
             month={monthData.month}
             onSave={(income) => onSave({ ...monthData, income })}
-            onHasChangesChange={setIncomeHasChanges}
           />
         </CardContent>
       </Card>
@@ -296,7 +267,6 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
       <MonthlySavingsEntry
         monthData={monthData}
         onSave={onSave}
-        onHasChangesChange={setSavingsHasChanges}
       />
 
       {/* Expense Entry */}

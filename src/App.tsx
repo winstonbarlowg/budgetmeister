@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FolderOpen, Calendar, CalendarRange, BarChart3, Settings, TrendingUp, Upload, AlertTriangle } from 'lucide-react';
+import { FolderOpen, Calendar, CalendarRange, BarChart3, Settings, TrendingUp, Upload } from 'lucide-react';
 import { SettingsManager } from './components/SettingsManager';
 import { MonthlyEntry } from './components/MonthlyEntry';
 import { Visualizations } from './components/Visualizations';
@@ -11,8 +11,8 @@ import { calculateMonthSummary } from './utils/calculations';
 import { BudgetConfig, MonthData, MonthSummary, CategorizedTransaction } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './components/ui/dialog';
 import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner';
 import { cn } from './lib/utils';
 
 const NAV_ITEMS = [
@@ -32,10 +32,6 @@ function App() {
   const [yearData, setYearData] = useState<MonthSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('monthly');
-  const [monthlyHasChanges, setMonthlyHasChanges] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<
-    { type: 'tab'; tab: string } | { type: 'month'; year: number; month: number } | null
-  >(null);
 
   const handleOpenDirectory = async () => {
     setLoading(true);
@@ -91,13 +87,16 @@ function App() {
     }
   };
 
+  // Edits on the Monthly page save as they happen, so show them before the write finishes
   const handleSaveMonthData = async (data: MonthData) => {
+    setMonthData(data);
     try {
       await fileSystemManager.saveMonthData(data);
-      setMonthData(data);
       await loadYearData();
     } catch (err) {
       console.error('Failed to save month data:', err);
+      toast.error('Could not save your changes. Reloading this month from disk.');
+      setMonthData(await fileSystemManager.loadMonthData(data.year, data.month));
     }
   };
 
@@ -123,33 +122,6 @@ function App() {
     } catch (err) {
       console.error('Failed to load year data:', err);
     }
-  };
-
-  const handleTabChange = (tab: string) => {
-    if (activeTab === 'monthly' && monthlyHasChanges) {
-      setPendingNavigation({ type: 'tab', tab });
-      return;
-    }
-    setActiveTab(tab);
-  };
-
-  const handleMonthChangeWithGuard = (year: number, month: number) => {
-    if (monthlyHasChanges) {
-      setPendingNavigation({ type: 'month', year, month });
-      return;
-    }
-    handleMonthChange(year, month);
-  };
-
-  const handleDiscardAndNavigate = () => {
-    if (!pendingNavigation) return;
-    setMonthlyHasChanges(false);
-    if (pendingNavigation.type === 'tab') {
-      setActiveTab(pendingNavigation.tab);
-    } else {
-      handleMonthChange(pendingNavigation.year, pendingNavigation.month);
-    }
-    setPendingNavigation(null);
   };
 
   useEffect(() => {
@@ -269,7 +241,7 @@ function App() {
               key={id}
               variant={activeTab === id ? 'default' : 'ghost'}
               className={cn('w-full justify-start gap-3 h-11', activeTab !== id && 'text-muted-foreground')}
-              onClick={() => handleTabChange(id)}
+              onClick={() => setActiveTab(id)}
               aria-current={activeTab === id ? 'page' : undefined}
             >
               <Icon className="h-5 w-5" />
@@ -291,14 +263,12 @@ function App() {
                 config={config}
                 monthData={monthData}
                 onSave={handleSaveMonthData}
-                onMonthChange={handleMonthChangeWithGuard}
-                onHasChangesChange={setMonthlyHasChanges}
+                onMonthChange={handleMonthChange}
               />
               <MonthTransactions
                 categories={config.categories}
                 monthData={monthData}
                 onSave={handleSaveMonthData}
-                disabled={monthlyHasChanges}
               />
             </div>
           )}
@@ -427,29 +397,6 @@ function App() {
           )}
         </div>
       </main>
-
-      {/* Unsaved Changes Confirmation Dialog */}
-      <Dialog open={pendingNavigation !== null} onOpenChange={(open) => { if (!open) setPendingNavigation(null); }}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-warning" />
-              Unsaved Changes
-            </DialogTitle>
-            <DialogDescription>
-              You have unsaved changes that will be lost if you leave this page.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setPendingNavigation(null)}>
-              Go Back
-            </Button>
-            <Button variant="destructive" onClick={handleDiscardAndNavigate}>
-              Discard & Leave
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Toaster richColors closeButton />
     </div>
