@@ -150,7 +150,7 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-2xl">Income Sources</CardTitle>
+              <CardTitle className="text-lg">Income Sources</CardTitle>
               <CardDescription>
                 Manage your income streams with date ranges and default amounts
               </CardDescription>
@@ -163,7 +163,7 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
         <CardContent>
           <div className="space-y-4">
             {incomeSources.length === 0 ? (
-              <div className="rounded-lg border-2 border-dashed p-12 text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
                 <p className="mb-2 font-semibold">No income sources defined yet</p>
                 <p>Click "Add Income Source" to set up your first income stream</p>
               </div>
@@ -172,23 +172,23 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
                 {incomeSources.map((source) => (
                   <div
                     key={source.id}
-                    className="group relative flex items-center gap-4 rounded-lg border bg-card p-4 transition-all hover:shadow-md"
+                    className="group relative flex items-center gap-3 rounded-lg border bg-card px-3 py-2 transition-colors hover:bg-muted/40"
                   >
                     <div
-                      className="h-16 w-1 rounded-full"
+                      className="h-10 w-1 rounded-full"
                       style={{ backgroundColor: source.color }}
                     />
                     <div className="flex-1">
                       <div className="flex items-start justify-between">
                         <div>
-                          <div className="font-semibold text-lg">{source.name}</div>
+                          <div className="font-medium">{source.name}</div>
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                             <Calendar className="h-4 w-4" />
                             {formatDateRange(source.startDate, source.endDate)}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-semibold">
+                          <div className="text-base font-semibold">
                             {formatCurrency(source.defaultNet)}
                           </div>
                           <div className="text-sm text-muted-foreground">
@@ -222,17 +222,17 @@ export const IncomeManager: React.FC<IncomeManagerProps> = ({ incomeSources, onS
                 ))}
 
                 {/* Total Summary */}
-                <div className="mt-6 rounded-lg bg-muted/50 p-6">
+                <div className="mt-4 rounded-lg bg-muted/50 p-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <div className="text-sm text-muted-foreground">Total Monthly Gross</div>
-                      <div className="text-2xl font-semibold text-primary">
+                      <div className="text-xl font-semibold text-primary">
                         {formatCurrency(totalGross)}
                       </div>
                     </div>
                     <div>
                       <div className="text-sm text-muted-foreground">Total Monthly Net</div>
-                      <div className="text-2xl font-semibold text-success">
+                      <div className="text-xl font-semibold text-success">
                         {formatCurrency(totalNet)}
                       </div>
                     </div>

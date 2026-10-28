@@ -249,7 +249,7 @@ export const BankTransactions: React.FC<BankTransactionsProps> = ({
   const hasDuplicates = importedTransactions.some(t => t.isDuplicate);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Upload section */}
       <Card>
         <CardHeader>

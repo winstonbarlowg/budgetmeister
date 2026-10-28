@@ -50,7 +50,7 @@ export const FileStatementSummary: React.FC<FileStatementSummaryProps> = ({
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div>
-            <CardTitle className="text-lg">Statement Summary</CardTitle>
+            <CardTitle className="text-base">Statement Summary</CardTitle>
             <CardDescription className="mt-1">
               {getBankDisplayName(bankSource)}
             </CardDescription>

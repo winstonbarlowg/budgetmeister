@@ -73,11 +73,11 @@ export const MonthPicker: React.FC<MonthPickerProps> = ({ year, month, onSelect 
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="flex items-center gap-2 rounded-lg px-2 -mx-2 text-3xl font-semibold leading-none tracking-tight hover:bg-accent transition-colors"
+          className="flex items-center gap-2 rounded-lg px-2 -mx-2 text-xl font-semibold leading-tight tracking-tight hover:bg-accent transition-colors"
           title="Choose a month"
         >
           {getMonthName(month)} {year}
-          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72">

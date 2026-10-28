@@ -99,12 +99,12 @@ export const TransactionUpload: React.FC<TransactionUploadProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={() => setIsDragging(false)}
         className={cn(
-          'rounded-lg border-2 border-dashed p-8 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+          'rounded-lg border-2 border-dashed p-6 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           isProcessing ? 'cursor-wait opacity-60' : 'cursor-pointer hover:border-primary hover:bg-muted/40',
           isDragging && 'border-primary bg-primary/5'
         )}
       >
-        <Upload className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+        <Upload className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
         <p className="mb-4 text-sm text-muted-foreground">
           {isProcessing ? 'Processing...' : isDragging ? 'Drop the CSV file to import it' : 'Drag & drop a CSV file here, or click to browse'}
         </p>

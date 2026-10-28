@@ -156,7 +156,7 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
 
         <CardContent>
           {movements.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-6 text-muted-foreground">
               <p>No money movements recorded for this month.</p>
               <p className="text-sm mt-2">Click "Add Movement" to start tracking your savings and investments.</p>
             </div>
@@ -164,8 +164,8 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
             <>
               {/* Savings section */}
               {savingsMovements.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold mb-3 flex items-center text-success">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold mb-2 flex items-center text-success">
                     <PiggyBank className="mr-2 h-4 w-4" />
                     Savings
                   </h3>
@@ -216,8 +216,8 @@ export const MonthlySavingsEntry: React.FC<MonthlySavingsEntryProps> = ({
 
               {/* Investments section */}
               {investmentMovements.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-semibold mb-3 flex items-center text-info">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold mb-2 flex items-center text-info">
                     <TrendingUp className="mr-2 h-4 w-4" />
                     Investments
                   </h3>

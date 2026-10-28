@@ -133,7 +133,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-2xl">Budget Categories</CardTitle>
+              <CardTitle className="text-lg">Budget Categories</CardTitle>
               <CardDescription>Manage your monthly budget categories and amounts</CardDescription>
             </div>
             <Button onClick={handleAdd} size="lg">
@@ -142,35 +142,36 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-8 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2">
             {/* Fixed Expenses */}
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Fixed Expenses</h3>
+                <h3 className="text-sm font-semibold">Fixed Expenses</h3>
                 <span className="text-sm font-medium text-muted-foreground">
                   {formatCurrency(fixedTotal)}/mo
                 </span>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                 {fixedCategories.map((category) => (
                   <div
                     key={category.id}
-                    className="group relative flex items-center gap-3 rounded-lg border bg-card p-4 transition-all hover:shadow-md"
+                    className="group relative flex items-center gap-3 rounded-lg border bg-card px-3 py-2 transition-colors hover:bg-muted/40"
                   >
                     <div
-                      className="h-12 w-1 rounded-full"
+                      className="h-8 w-1 rounded-full"
                       style={{ backgroundColor: category.color }}
                     />
                     <div className="flex-1">
-                      <div className="font-semibold">{category.name}</div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="font-medium">{category.name}</div>
+                      <div className="text-xs text-muted-foreground">
                         {formatCurrency(category.budgetAmount)} per month
                       </div>
                     </div>
-                    <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7"
                         onClick={() => handleEdit(category)}
                       >
                         <Edit2 className="h-4 w-4" />
@@ -178,6 +179,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7"
                         onClick={() => handleDelete(category.id)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -186,7 +188,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                   </div>
                 ))}
                 {fixedCategories.length === 0 && (
-                  <div className="rounded-lg border-2 border-dashed p-8 text-center text-sm text-muted-foreground">
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                     No fixed expenses yet. Click "Add Category" to get started.
                   </div>
                 )}
@@ -194,33 +196,34 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
             </div>
 
             {/* Variable Expenses */}
-            <div className="space-y-4">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Variable Expenses</h3>
+                <h3 className="text-sm font-semibold">Variable Expenses</h3>
                 <span className="text-sm font-medium text-muted-foreground">
                   {formatCurrency(variableTotal)}/mo
                 </span>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                 {variableCategories.map((category) => (
                   <div
                     key={category.id}
-                    className="group relative flex items-center gap-3 rounded-lg border bg-card p-4 transition-all hover:shadow-md"
+                    className="group relative flex items-center gap-3 rounded-lg border bg-card px-3 py-2 transition-colors hover:bg-muted/40"
                   >
                     <div
-                      className="h-12 w-1 rounded-full"
+                      className="h-8 w-1 rounded-full"
                       style={{ backgroundColor: category.color }}
                     />
                     <div className="flex-1">
-                      <div className="font-semibold">{category.name}</div>
-                      <div className="text-sm text-muted-foreground">
+                      <div className="font-medium">{category.name}</div>
+                      <div className="text-xs text-muted-foreground">
                         {formatCurrency(category.budgetAmount)} per month
                       </div>
                     </div>
-                    <div className="flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7"
                         onClick={() => handleEdit(category)}
                       >
                         <Edit2 className="h-4 w-4" />
@@ -228,6 +231,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-7 w-7"
                         onClick={() => handleDelete(category.id)}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />
@@ -236,7 +240,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                   </div>
                 ))}
                 {variableCategories.length === 0 && (
-                  <div className="rounded-lg border-2 border-dashed p-8 text-center text-sm text-muted-foreground">
+                  <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
                     No variable expenses yet. Click "Add Category" to get started.
                   </div>
                 )}
@@ -245,12 +249,12 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
           </div>
 
           {/* Total Summary */}
-          <div className="mt-6 rounded-lg bg-muted/50 p-6">
-            <div className="flex items-center justify-between text-lg font-semibold">
+          <div className="mt-4 rounded-lg bg-muted/50 p-4">
+            <div className="flex items-center justify-between font-semibold">
               <span>Total Monthly Budget</span>
-              <span className="text-2xl text-primary">{formatCurrency(fixedTotal + variableTotal)}</span>
+              <span className="text-xl text-primary">{formatCurrency(fixedTotal + variableTotal)}</span>
             </div>
-            <div className="mt-2 flex gap-6 text-sm text-muted-foreground">
+            <div className="mt-1 flex gap-6 text-xs text-muted-foreground">
               <span>Fixed: {formatCurrency(fixedTotal)}</span>
               <span>Variable: {formatCurrency(variableTotal)}</span>
             </div>

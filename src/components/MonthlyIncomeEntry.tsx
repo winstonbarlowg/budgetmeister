@@ -66,7 +66,7 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
 
   if (activeSources.length === 0) {
     return (
-      <div className="rounded-lg border-2 border-dashed p-8 text-center">
+      <div className="rounded-lg border border-dashed p-6 text-center">
         <p className="text-sm text-muted-foreground mb-2">No income sources active for this month</p>
         <p className="text-xs text-muted-foreground">
           Go to Settings → Income Sources to add income streams with date ranges
@@ -76,7 +76,7 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {activeSources.map((source) => {
         const income = incomeBySource.get(source.id)!;
         const isDefault = !overriddenIds.has(source.id) || matchesDefaults(income, defaultsBySource.get(source.id));
@@ -85,17 +85,17 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
         return (
           <div
             key={source.id}
-            className="relative rounded-lg border bg-card p-5 space-y-4"
+            className="relative rounded-lg border bg-card p-3 space-y-3"
           >
-            <div className="flex items-start justify-between">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div
-                  className="h-12 w-1 rounded-full"
+                  className="h-8 w-1 rounded-full"
                   style={{ backgroundColor: source.color }}
                 />
                 <div>
-                  <h4 className="font-semibold text-lg">{source.name}</h4>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                  <h4 className="font-medium">{source.name}</h4>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                     {isDefault ? (
                       <>
                         <CheckCircle2 className="h-3 w-3" />
@@ -120,7 +120,7 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
 
             <div className="grid grid-cols-5 gap-2">
               {INCOME_FIELDS.map(({ field, label, idSuffix }) => (
-                <div key={field} className="space-y-2 rounded-md bg-muted p-3">
+                <div key={field} className="space-y-1 rounded-md bg-muted p-2">
                   <Label htmlFor={`${source.id}-${idSuffix}`} className={field === 'net' ? 'text-xs font-semibold' : 'text-xs'}>
                     {label}
                   </Label>
@@ -144,9 +144,9 @@ export const MonthlyIncomeEntry: React.FC<MonthlyIncomeEntryProps> = ({
         );
       })}
 
-      <div className="rounded-lg border bg-muted/50 p-4">
+      <div className="rounded-lg border bg-muted/50 px-3 py-2 flex items-center justify-between">
         <div className="text-sm text-muted-foreground">Total Monthly Net Income</div>
-        <div className="text-2xl font-semibold text-success">{formatCurrency(totalNet)}</div>
+        <div className="text-lg font-semibold text-success">{formatCurrency(totalNet)}</div>
       </div>
     </div>
   );

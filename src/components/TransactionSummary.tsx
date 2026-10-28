@@ -31,7 +31,7 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>Total Transactions</CardDescription>
-          <CardTitle className="text-3xl">{stats.total}</CardTitle>
+          <CardTitle className="text-2xl">{stats.total}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-xs text-muted-foreground">
@@ -43,7 +43,7 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>High Confidence</CardDescription>
-          <CardTitle className="text-3xl text-success">{stats.highConfidence}</CardTitle>
+          <CardTitle className="text-2xl text-success">{stats.highConfidence}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-xs text-muted-foreground">Auto-approved ready</p>
@@ -53,7 +53,7 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>Needs Review</CardDescription>
-          <CardTitle className="text-3xl text-warning">
+          <CardTitle className="text-2xl text-warning">
             {stats.mediumConfidence + stats.lowConfidence}
           </CardTitle>
         </CardHeader>
@@ -65,7 +65,7 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
       <Card>
         <CardHeader className="pb-2">
           <CardDescription>Uncategorized</CardDescription>
-          <CardTitle className="text-3xl text-destructive">{stats.uncategorized}</CardTitle>
+          <CardTitle className="text-2xl text-destructive">{stats.uncategorized}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-xs text-muted-foreground">Requires manual category</p>
@@ -76,7 +76,7 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
         <Card className="border-warning/30 bg-warning/10">
           <CardHeader className="pb-2">
             <CardDescription>Duplicate Transactions</CardDescription>
-            <CardTitle className="text-3xl text-warning">{stats.duplicates}</CardTitle>
+            <CardTitle className="text-2xl text-warning">{stats.duplicates}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Found in same import</p>
@@ -88,7 +88,7 @@ export const TransactionSummary: React.FC<TransactionSummaryProps> = ({ transact
         <Card className="border-border bg-muted">
           <CardHeader className="pb-2">
             <CardDescription>Excluded</CardDescription>
-            <CardTitle className="text-3xl text-muted-foreground">{stats.excluded}</CardTitle>
+            <CardTitle className="text-2xl text-muted-foreground">{stats.excluded}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">Won't be applied</p>
