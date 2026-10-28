@@ -220,31 +220,31 @@ function App() {
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-background via-background to-muted">
       {/* Fixed Left Sidebar Navigation */}
-      <aside className="fixed left-0 top-0 h-screen w-64 border-r bg-card shadow-lg flex flex-col">
+      <aside className="fixed left-0 top-0 h-screen w-56 border-r bg-card flex flex-col">
         {/* Header */}
-        <div className="p-6 border-b">
+        <div className="px-4 py-3 border-b">
           <div className="flex items-center gap-3">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <TrendingUp className="h-5 w-5" />
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <TrendingUp className="h-4 w-4" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">Budget Tracker</h1>
+              <h1 className="text-base font-semibold tracking-tight">Budget Tracker</h1>
               <p className="text-xs text-muted-foreground">Managing finances</p>
             </div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-2 space-y-0.5">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
             <Button
               key={id}
               variant={activeTab === id ? 'default' : 'ghost'}
-              className={cn('w-full justify-start gap-3 h-11', activeTab !== id && 'text-muted-foreground')}
+              className={cn('w-full justify-start gap-2.5 h-8', activeTab !== id && 'text-muted-foreground')}
               onClick={() => setActiveTab(id)}
               aria-current={activeTab === id ? 'page' : undefined}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-4 w-4" />
               {label}
             </Button>
           ))}
@@ -252,8 +252,8 @@ function App() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="ml-64 flex-1 p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <main className="ml-56 flex-1 p-6">
+        <div className="max-w-7xl mx-auto space-y-4">
 
           {activeTab === 'monthly' && (
             <div className="space-y-4">
@@ -365,7 +365,7 @@ function App() {
             <div className="space-y-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-2xl">Analytics & Insights</CardTitle>
+                  <CardTitle className="text-lg">Analytics & Insights</CardTitle>
                   <CardDescription>
                     Visual insights into your spending patterns and budget performance
                   </CardDescription>

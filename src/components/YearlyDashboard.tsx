@@ -36,7 +36,7 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
   const worstMonth = [...monthsWithSpending].sort((a, b) => b.totalVariance - a.totalVariance)[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Year Summary Table */}
       <Card>
         <CardHeader>
@@ -56,9 +56,9 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
             <TableBody>
               <TableRow>
                 <TableCell className="font-semibold">Total</TableCell>
-                <TableCell className="text-right text-lg font-semibold tabular-nums">{formatCurrency(totalBudget)}</TableCell>
-                <TableCell className="text-right text-lg font-semibold tabular-nums">{formatCurrency(totalActual)}</TableCell>
-                <TableCell className={cn('text-right text-lg font-bold tabular-nums', varianceClass(totalVariance))}>
+                <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(totalBudget)}</TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(totalActual)}</TableCell>
+                <TableCell className={cn('text-right font-bold tabular-nums', varianceClass(totalVariance))}>
                   {totalVariance > 0 ? '+' : ''}{formatCurrency(totalVariance)}
                 </TableCell>
               </TableRow>
@@ -76,7 +76,7 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
       </Card>
 
       {/* Best and Challenging Months */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-success">
@@ -91,23 +91,23 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Month</div>
-                  <div className="text-2xl font-bold">{getMonthName(bestMonth.month)}</div>
+                  <div className="text-xl font-bold">{getMonthName(bestMonth.month)}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">
                     {bestMonth.totalVariance > 0 ? 'Over Budget' : 'Under Budget'}
                   </div>
-                  <div className={`text-2xl font-bold ${bestMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
+                  <div className={`text-xl font-bold ${bestMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
                     {formatCurrency(Math.abs(bestMonth.totalVariance))}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Budget</div>
-                  <div className="text-lg font-semibold">{formatCurrency(bestMonth.totalBudget)}</div>
+                  <div className="text-base font-semibold">{formatCurrency(bestMonth.totalBudget)}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Spent</div>
-                  <div className="text-lg font-semibold">{formatCurrency(bestMonth.totalActual)}</div>
+                  <div className="text-base font-semibold">{formatCurrency(bestMonth.totalActual)}</div>
                 </div>
               </div>
             )}
@@ -128,23 +128,23 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Month</div>
-                  <div className="text-2xl font-bold">{getMonthName(worstMonth.month)}</div>
+                  <div className="text-xl font-bold">{getMonthName(worstMonth.month)}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">
                     {worstMonth.totalVariance > 0 ? 'Over Budget' : 'Under Budget'}
                   </div>
-                  <div className={`text-2xl font-bold ${worstMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
+                  <div className={`text-xl font-bold ${worstMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
                     {formatCurrency(Math.abs(worstMonth.totalVariance))}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Budget</div>
-                  <div className="text-lg font-semibold">{formatCurrency(worstMonth.totalBudget)}</div>
+                  <div className="text-base font-semibold">{formatCurrency(worstMonth.totalBudget)}</div>
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Spent</div>
-                  <div className="text-lg font-semibold">{formatCurrency(worstMonth.totalActual)}</div>
+                  <div className="text-base font-semibold">{formatCurrency(worstMonth.totalActual)}</div>
                 </div>
               </div>
             )}

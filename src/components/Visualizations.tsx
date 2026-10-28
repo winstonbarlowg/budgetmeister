@@ -169,7 +169,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Month and Year Selector Header */}
       <Card>
         <CardHeader>
@@ -215,7 +215,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
       </Card>
 
       {/* 2-Column Grid for Monthly Charts */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-2 gap-4">
         {/* 1. Budget vs Actual Comparison */}
         <Card>
           <CardHeader>
@@ -332,7 +332,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
           <CardDescription>Budget performance across all months</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-8 p-4">
+          <div className="space-y-6 p-4">
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="font-medium">Budget used: {ytdPercent.toFixed(1)}%</span>

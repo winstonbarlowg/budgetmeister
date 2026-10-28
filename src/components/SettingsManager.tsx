@@ -21,10 +21,10 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
   const [activeTab, setActiveTab] = useState('categories');
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Settings</CardTitle>
+          <CardTitle className="text-lg">Settings</CardTitle>
           <CardDescription>Manage your budget categories and income sources</CardDescription>
         </CardHeader>
         <CardContent>
@@ -35,11 +35,11 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
         </CardContent>
       </Card>
 
-      <TabsContent value="categories" className="space-y-6">
+      <TabsContent value="categories" className="space-y-4">
         <CategoryManager categories={categories} onSave={onSaveCategories} />
       </TabsContent>
 
-      <TabsContent value="income" className="space-y-6">
+      <TabsContent value="income" className="space-y-4">
         <IncomeManager incomeSources={incomeSources} onSave={onSaveIncomeSources} />
       </TabsContent>
     </Tabs>

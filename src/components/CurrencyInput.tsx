@@ -80,7 +80,7 @@ export const CurrencyInput: React.FC<CurrencyInputProps> = ({
     <div
       id={id}
       onClick={() => setIsEditing(true)}
-      className={cn('h-10 px-3 py-2 cursor-pointer hover:bg-accent/50 rounded-lg transition-colors text-right font-bold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', className)}
+      className={cn('h-9 px-3 py-1.5 cursor-pointer hover:bg-accent/50 rounded-lg transition-colors text-right font-bold tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', className)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {

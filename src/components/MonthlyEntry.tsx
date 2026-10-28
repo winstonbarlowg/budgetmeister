@@ -146,23 +146,23 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   const isUnderBudget = summary.totalVariance <= 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Month Navigation */}
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
             <div>
               <MonthPicker year={monthData.year} month={monthData.month} onSelect={onMonthChange} />
-              <CardDescription className="mt-1.5">Enter your expenses for this month. Changes save automatically.</CardDescription>
+              <CardDescription className="mt-1">Enter your expenses for this month. Changes save automatically.</CardDescription>
             </div>
             <Button variant="outline" size="icon" onClick={handleNextMonth}>
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
             {!isCurrentMonth && (
-              <Button variant="outline" onClick={handleCurrentMonth}>
+              <Button variant="outline" size="sm" onClick={handleCurrentMonth}>
                 <CalendarCheck className="h-4 w-4" /> This month
               </Button>
             )}
@@ -172,23 +172,23 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/40 shadow-lg shadow-primary/10">
-          <CardHeader className="pb-3">
-            <CardDescription className="font-semibold">Total Budget</CardDescription>
-            <CardTitle className="text-3xl text-primary">{formatCurrency(summary.totalBudget)}</CardTitle>
+        <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/40">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-medium">Total Budget</CardDescription>
+            <CardTitle className="text-2xl text-primary">{formatCurrency(summary.totalBudget)}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">Monthly allocation</p>
+            <p className="text-xs text-muted-foreground">Monthly allocation</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-gradient-to-br from-info/20 to-info/5 border-info/40 shadow-lg shadow-info/10">
-          <CardHeader className="pb-3">
-            <CardDescription className="font-semibold">Total Spent</CardDescription>
-            <CardTitle className="text-3xl text-info">{formatCurrency(summary.totalActual)}</CardTitle>
+        <Card className="bg-gradient-to-br from-info/20 to-info/5 border-info/40">
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-medium">Total Spent</CardDescription>
+            <CardTitle className="text-2xl text-info">{formatCurrency(summary.totalActual)}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-xs">
               <span className="text-muted-foreground">
                 {summary.totalActual > 0
                   ? `${((summary.totalActual / summary.totalBudget) * 100).toFixed(1)}% of budget`
@@ -198,14 +198,14 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
           </CardContent>
         </Card>
 
-        <Card className={isUnderBudget ? "bg-gradient-to-br from-success/20 to-success/5 border-success/40 shadow-lg shadow-success/10" : "bg-gradient-to-br from-destructive/20 to-destructive/5 border-destructive/40 shadow-lg shadow-destructive/10"}>
-          <CardHeader className="pb-3">
-            <CardDescription className="font-semibold">Variance</CardDescription>
-            <CardTitle className="text-3xl flex items-center gap-2">
+        <Card className={isUnderBudget ? "bg-gradient-to-br from-success/20 to-success/5 border-success/40" : "bg-gradient-to-br from-destructive/20 to-destructive/5 border-destructive/40"}>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-medium">Variance</CardDescription>
+            <CardTitle className="text-2xl flex items-center gap-2">
               {isUnderBudget ? (
-                <TrendingDown className="h-8 w-8 text-success" />
+                <TrendingDown className="h-5 w-5 text-success" />
               ) : (
-                <TrendingUp className="h-8 w-8 text-destructive" />
+                <TrendingUp className="h-5 w-5 text-destructive" />
               )}
               <span className={isUnderBudget ? 'text-success' : 'text-destructive'}>
                 {summary.totalVariance > 0 ? '+' : ''}
@@ -214,30 +214,30 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className={`text-sm font-semibold ${isUnderBudget ? 'text-success' : 'text-destructive'}`}>
+            <p className={`text-xs font-medium ${isUnderBudget ? 'text-success' : 'text-destructive'}`}>
               {isUnderBudget ? 'Under budget' : 'Over budget'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className={summary.disposableIncome >= 0 ? "bg-gradient-to-br from-highlight/20 to-highlight/5 border-highlight/40 shadow-lg shadow-highlight/10" : "bg-gradient-to-br from-destructive/20 to-destructive/5 border-destructive/40 shadow-lg shadow-destructive/10"}>
-          <CardHeader className="pb-3">
-            <CardDescription className="font-semibold">Disposable Income</CardDescription>
-            <CardTitle className="text-3xl flex items-center gap-2">
-              <DollarSign className={`h-8 w-8 ${summary.disposableIncome >= 0 ? 'text-highlight' : 'text-destructive'}`} />
+        <Card className={summary.disposableIncome >= 0 ? "bg-gradient-to-br from-highlight/20 to-highlight/5 border-highlight/40" : "bg-gradient-to-br from-destructive/20 to-destructive/5 border-destructive/40"}>
+          <CardHeader className="pb-2">
+            <CardDescription className="text-xs font-medium">Disposable Income</CardDescription>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <DollarSign className={`h-5 w-5 ${summary.disposableIncome >= 0 ? 'text-highlight' : 'text-destructive'}`} />
               <span className={summary.disposableIncome >= 0 ? 'text-highlight font-bold' : 'text-destructive font-bold'}>
                 {formatCurrency(summary.disposableIncome)}
               </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-1">
+            <p className="text-xs text-muted-foreground">
               Income - Expenses
             </p>
             {summary.totalMoneyMovements > 0 && (
-              <div className="mt-3 pt-3 border-t border-highlight/30">
+              <div className="mt-2 pt-2 border-t border-highlight/30">
                 <p className="text-xs text-muted-foreground">After Savings & Investments:</p>
-                <div className={`text-lg font-semibold ${summary.netDisposableIncome >= 0 ? 'text-highlight' : 'text-destructive'}`}>
+                <div className={`text-base font-semibold ${summary.netDisposableIncome >= 0 ? 'text-highlight' : 'text-destructive'}`}>
                   {formatCurrency(summary.netDisposableIncome)}
                 </div>
               </div>
@@ -270,7 +270,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
       />
 
       {/* Expense Entry */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {/* Fixed Expenses */}
         <Card>
           <CardHeader>
@@ -292,7 +292,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {fixedCategories.map((category) => {
               const detail = expenseDetails[category.id];
               const hasImports = detail && (detail.importedAmount || 0) > 0;
@@ -300,20 +300,20 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
 
               return (
                 <div key={category.id}>
-                  <div className="flex items-start justify-between">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
-                        className="h-10 w-1 rounded-full"
+                        className="h-8 w-1 rounded-full"
                         style={{ backgroundColor: category.color }}
                       />
                       <div>
-                        <Label htmlFor={category.id} className="text-base font-semibold">
+                        <Label htmlFor={category.id} className="font-medium">
                           {category.name}
                         </Label>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           Budget: {formatCurrency(category.budgetAmount)}
                           {hasImports && (
-                            <span className="ml-2 text-xs text-info font-medium">
+                            <span className="ml-1 text-info font-medium">
                               • {formatCurrency(detail.importedAmount || 0)} imported
                             </span>
                           )}
@@ -331,8 +331,8 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                 </div>
               );
             })}
-            <div className="pt-4 border-t">
-              <div className="flex items-center justify-between text-lg font-semibold">
+            <div className="pt-3 border-t">
+              <div className="flex items-center justify-between font-semibold">
                 <span>Fixed Total</span>
                 <span className={summary.fixedActual > summary.fixedBudget ? 'text-destructive' : 'text-success'}>
                   {formatCurrency(summary.fixedActual)}
@@ -350,28 +350,28 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
               {formatCurrency(summary.variableActual)} / {formatCurrency(summary.variableBudget)}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3">
             {variableCategories.map((category) => {
               const detail = expenseDetails[category.id];
               const hasImports = detail && (detail.importedAmount || 0) > 0;
               const minimum = detail ? getMinimumExpenseAmount(detail) : 0;
 
               return (
-                <div key={category.id} className="space-y-3">
-                  <div className="flex items-start justify-between">
+                <div key={category.id} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
-                        className="h-10 w-1 rounded-full"
+                        className="h-8 w-1 rounded-full"
                         style={{ backgroundColor: category.color }}
                       />
                       <div>
-                        <Label htmlFor={category.id} className="text-base font-semibold">
+                        <Label htmlFor={category.id} className="font-medium">
                           {category.name}
                         </Label>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-xs text-muted-foreground">
                           Budget: {formatCurrency(category.budgetAmount)}
                           {hasImports && (
-                            <span className="ml-2 text-xs text-info font-medium">
+                            <span className="ml-1 text-info font-medium">
                               • {formatCurrency(detail.importedAmount || 0)} imported
                             </span>
                           )}
@@ -408,8 +408,8 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                 </div>
               );
             })}
-            <div className="pt-4 border-t">
-              <div className="flex items-center justify-between text-lg font-semibold">
+            <div className="pt-3 border-t">
+              <div className="flex items-center justify-between font-semibold">
                 <span>Variable Total</span>
                 <span className={summary.variableActual > summary.variableBudget ? 'text-destructive' : 'text-success'}>
                   {formatCurrency(summary.variableActual)}
