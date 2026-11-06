@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, X } from 'lucide-react';
 import { Category } from '../types';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -10,12 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Checkbox } from './ui/checkbox';
 import { useConfirm } from './ui/confirm-dialog';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { MoneyInput } from './MoneyInput';
 import { MonthPickerField } from './MonthPicker';
-import { formatCurrency } from '../utils/calculations';
+import { formatCurrency, getCurrentExpectedAmount } from '../utils/calculations';
 
 interface CategoryManagerProps {
   categories: Category[];
@@ -31,24 +30,32 @@ const PRESET_COLORS = [
 
 const slugify = (name: string) => name.trim().toLowerCase().replace(/\s+/g, '-');
 
+type ExpectedAmountValues = { amount: number; from: string; until: string };
+
 type CategoryFormValues = {
   name: string;
   type: 'fixed' | 'variable';
   budgetAmount: number;
   color: string;
-  autoFill: boolean;
-  activeFrom: string;
-  activeUntil: string;
+  expectedAmounts: ExpectedAmountValues[];
 };
 
 const formatMonth = (value: string) =>
   new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1).toLocaleString('en', { month: 'short', year: 'numeric' });
 
-const describeAutoFill = (category: Category) => {
-  if (category.type !== 'fixed' || !category.autoFill) return null;
-  const from = category.activeFrom ? `from ${formatMonth(category.activeFrom)}` : 'every month';
-  const until = category.activeUntil ? ` to ${formatMonth(category.activeUntil)}` : '';
-  return `Auto-fills ${from}${until}`;
+const toMonthValue = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+const previousMonth = (value: string) => toMonthValue(new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 2));
+
+// Fixed categories show what they're expected to cost, or that they come from transactions
+const describeFixed = (category: Category) => {
+  const current = getCurrentExpectedAmount(category);
+  if (!current) return 'From transactions';
+  const range = current.until
+    ? `${current.from ? formatMonth(current.from) : 'until'} – ${formatMonth(current.until)}`
+    : current.from ? `since ${formatMonth(current.from)}` : 'every month';
+  const periods = category.expectedAmounts?.length || 0;
+  return `${formatCurrency(current.amount)} expected ${range}${periods > 1 ? ` • ${periods} periods` : ''}`;
 };
 
 export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onSave }) => {
@@ -72,12 +79,16 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
     type: z.enum(['fixed', 'variable']),
     budgetAmount: z.number().min(0, 'Must be zero or more'),
     color: z.string(),
-    autoFill: z.boolean(),
-    activeFrom: z.string(),
-    activeUntil: z.string(),
-  }).refine(v => !v.activeFrom || !v.activeUntil || v.activeUntil >= v.activeFrom, {
-    message: 'Must be after the start month',
-    path: ['activeUntil'],
+    expectedAmounts: z.array(
+      z.object({
+        amount: z.number().min(0, 'Must be zero or more'),
+        from: z.string(),
+        until: z.string(),
+      }).refine(v => !v.from || !v.until || v.until >= v.from, {
+        message: 'Must be after From',
+        path: ['until'],
+      })
+    ),
   });
 
   const schemaRef = useRef(categorySchema);
@@ -86,10 +97,24 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
   const form = useForm<CategoryFormValues>({
     resolver: (values, context, options) => zodResolver(schemaRef.current)(values, context, options),
     defaultValues: {
-      name: '', type: 'variable', budgetAmount: 0, color: PRESET_COLORS[0],
-      autoFill: false, activeFrom: '', activeUntil: '',
+      name: '', type: 'variable', budgetAmount: 0, color: PRESET_COLORS[0], expectedAmounts: [],
     },
   });
+  const expectedAmounts = useFieldArray({ control: form.control, name: 'expectedAmounts' });
+
+  // A new period starts this month: the current one now ends last month, and the new one
+  // keeps its end date (e.g. when a loan finishes)
+  const handleAmountChanged = () => {
+    const thisMonth = toMonthValue(new Date());
+    const rows = form.getValues('expectedAmounts');
+    const lastIndex = rows.length - 1;
+    const last = rows[lastIndex] && { ...rows[lastIndex] };  // copy: setValue below changes the form's object
+    const lastRunsOn = !!last && (!last.until || last.until >= thisMonth) && (!last.from || last.from < thisMonth);
+    if (lastRunsOn) {
+      form.setValue(`expectedAmounts.${lastIndex}.until`, previousMonth(thisMonth));
+    }
+    expectedAmounts.append({ amount: last?.amount || 0, from: thisMonth, until: lastRunsOn ? last.until : '' });
+  };
 
   const handleAdd = () => {
     setEditingCategory(null);
@@ -98,9 +123,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
       type: 'variable',
       budgetAmount: 0,
       color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
-      autoFill: false,
-      activeFrom: '',
-      activeUntil: '',
+      expectedAmounts: [],
     });
     setIsModalOpen(true);
   };
@@ -112,9 +135,11 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
       type: category.type,
       budgetAmount: category.budgetAmount,
       color: category.color || PRESET_COLORS[0],
-      autoFill: !!category.autoFill,
-      activeFrom: category.activeFrom || '',
-      activeUntil: category.activeUntil || '',
+      expectedAmounts: (category.expectedAmounts || []).map(p => ({
+        amount: p.amount,
+        from: p.from || '',
+        until: p.until || '',
+      })),
     });
     setIsModalOpen(true);
   };
@@ -132,15 +157,16 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
   };
 
   const handleSubmit = (values: CategoryFormValues) => {
-    const { autoFill, activeFrom, activeUntil, ...rest } = values;
-    // Auto-fill only applies to fixed categories
-    const fillsIn = rest.type === 'fixed' && autoFill;
+    const { expectedAmounts: periods, ...rest } = values;
+    const isFixed = rest.type === 'fixed';
     const data: Omit<Category, 'id'> = {
       ...rest,
       name: rest.name.trim(),
-      autoFill: fillsIn || undefined,
-      activeFrom: fillsIn && activeFrom ? activeFrom : undefined,
-      activeUntil: fillsIn && activeUntil ? activeUntil : undefined,
+      // Fixed costs have no budget; variable categories have no expected amounts
+      budgetAmount: isFixed ? 0 : rest.budgetAmount,
+      expectedAmounts: isFixed && periods.length
+        ? periods.map(p => ({ amount: p.amount, from: p.from || undefined, until: p.until || undefined }))
+        : undefined,
     };
 
     if (editingCategory) {
@@ -163,7 +189,6 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
   const fixedCategories = categories.filter((c) => c.type === 'fixed');
   const variableCategories = categories.filter((c) => c.type === 'variable');
 
-  const fixedTotal = fixedCategories.reduce((sum, c) => sum + c.budgetAmount, 0);
   const variableTotal = variableCategories.reduce((sum, c) => sum + c.budgetAmount, 0);
 
   return (
@@ -173,7 +198,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg">Budget Categories</CardTitle>
-              <CardDescription>Manage your monthly budget categories and amounts</CardDescription>
+              <CardDescription>Fixed costs are tracked as they are; budgets apply to variable spending</CardDescription>
             </div>
             <Button onClick={handleAdd} size="lg">
               <Plus className="h-5 w-5" /> Add Category
@@ -186,9 +211,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Fixed Expenses</h3>
-                <span className="text-sm font-medium text-muted-foreground">
-                  {formatCurrency(fixedTotal)}/mo
-                </span>
+                <span className="text-sm font-medium text-muted-foreground">No budget</span>
               </div>
               <div className="space-y-1.5">
                 {fixedCategories.map((category) => (
@@ -203,8 +226,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                     <div className="flex-1">
                       <div className="font-medium">{category.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {formatCurrency(category.budgetAmount)} per month
-                        {describeAutoFill(category) && ` • ${describeAutoFill(category)}`}
+                        {describeFixed(category)}
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -240,7 +262,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Variable Expenses</h3>
                 <span className="text-sm font-medium text-muted-foreground">
-                  {formatCurrency(variableTotal)}/mo
+                  {formatCurrency(variableTotal)}/mo budget
                 </span>
               </div>
               <div className="space-y-1.5">
@@ -256,8 +278,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                     <div className="flex-1">
                       <div className="font-medium">{category.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {formatCurrency(category.budgetAmount)} per month
-                        {describeAutoFill(category) && ` • ${describeAutoFill(category)}`}
+                        {formatCurrency(category.budgetAmount)} budget per month
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -292,13 +313,12 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
           {/* Total Summary */}
           <div className="mt-4 rounded-lg bg-muted/50 p-4">
             <div className="flex items-center justify-between font-semibold">
-              <span>Total Monthly Budget</span>
-              <span className="text-xl text-primary">{formatCurrency(fixedTotal + variableTotal)}</span>
+              <span>Monthly Variable Budget</span>
+              <span className="text-xl text-primary">{formatCurrency(variableTotal)}</span>
             </div>
-            <div className="mt-1 flex gap-6 text-xs text-muted-foreground">
-              <span>Fixed: {formatCurrency(fixedTotal)}</span>
-              <span>Variable: {formatCurrency(variableTotal)}</span>
-            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Fixed costs come from their transactions, or their expected amount when nothing is imported.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -353,50 +373,39 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="budgetAmount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Monthly Budget</FormLabel>
-                  <FormControl>
-                    <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {form.watch('type') === 'fixed' && (
-              <div className="space-y-3 rounded-lg border p-3">
-                <FormField
-                  control={form.control}
-                  name="autoFill"
-                  render={({ field }) => (
-                    <FormItem className="flex items-start gap-2 space-y-0">
-                      <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
-                      </FormControl>
-                      <div className="space-y-0.5">
-                        <FormLabel className="font-normal">Fill in the monthly budget automatically</FormLabel>
-                        <p className="text-xs text-muted-foreground">
-                          For months with no transaction in this category, e.g. payments from accounts not in Emma.
-                          You can still type a different amount for a month.
-                        </p>
-                      </div>
-                    </FormItem>
-                  )}
-                />
-                {form.watch('autoFill') && (
-                  <div className="grid grid-cols-2 gap-3">
+            {form.watch('type') === 'variable' ? (
+              <FormField
+                control={form.control}
+                name="budgetAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monthly Budget</FormLabel>
+                    <FormControl>
+                      <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <div className="space-y-2 rounded-lg border p-3">
+                <div>
+                  <div className="text-sm font-medium">Expected amount (optional)</div>
+                  <p className="text-xs text-muted-foreground">
+                    Fixed costs have no budget. Leave this empty if the cost comes through your bank transactions.
+                    Set it for payments from accounts not in Emma: it fills in any month with nothing imported.
+                  </p>
+                </div>
+                {expectedAmounts.fields.map((row, index) => (
+                  <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_auto] items-start gap-2">
                     <FormField
                       control={form.control}
-                      name="activeFrom"
+                      name={`expectedAmounts.${index}.amount`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>From</FormLabel>
+                          {index === 0 && <FormLabel className="text-xs">Amount</FormLabel>}
                           <FormControl>
-                            <MonthPickerField value={field.value} onChange={field.onChange} placeholder="All months" clearable />
+                            <MoneyInput value={field.value} onChange={field.onChange} onBlur={field.onBlur} name={field.name} ref={field.ref} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -404,10 +413,23 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                     />
                     <FormField
                       control={form.control}
-                      name="activeUntil"
+                      name={`expectedAmounts.${index}.from`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Until</FormLabel>
+                          {index === 0 && <FormLabel className="text-xs">From</FormLabel>}
+                          <FormControl>
+                            <MonthPickerField value={field.value} onChange={field.onChange} placeholder="Always" clearable />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`expectedAmounts.${index}.until`}
+                      render={({ field }) => (
+                        <FormItem>
+                          {index === 0 && <FormLabel className="text-xs">Until</FormLabel>}
                           <FormControl>
                             <MonthPickerField value={field.value} onChange={field.onChange} placeholder="Ongoing" clearable />
                           </FormControl>
@@ -415,8 +437,22 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                         </FormItem>
                       )}
                     />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className={index === 0 ? 'mt-[22px]' : ''}
+                      onClick={() => expectedAmounts.remove(index)}
+                      aria-label="Remove this period"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
-                )}
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={handleAmountChanged}>
+                  <Plus className="h-3.5 w-3.5" />
+                  {expectedAmounts.fields.length === 0 ? 'Add expected amount' : 'Amount changed'}
+                </Button>
               </div>
             )}
 

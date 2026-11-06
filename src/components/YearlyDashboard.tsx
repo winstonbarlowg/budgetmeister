@@ -23,17 +23,20 @@ interface YearlyDashboardProps {
 }
 
 export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData }) => {
-  const totalBudget = yearData.reduce((sum, m) => sum + m.totalBudget, 0);
-  const totalActual = yearData.reduce((sum, m) => sum + m.totalActual, 0);
-  const totalVariance = totalActual - totalBudget;
-
-  const avgMonthlyBudget = totalBudget / 12;
-  const avgMonthlyActual = totalActual / yearData.filter(m => m.totalActual > 0).length || 0;
-
   // Months with no spending yet (e.g. the rest of this year) would otherwise look fully under budget
   const monthsWithSpending = yearData.filter(m => m.totalActual > 0);
-  const bestMonth = [...monthsWithSpending].sort((a, b) => a.totalVariance - b.totalVariance)[0];
-  const worstMonth = [...monthsWithSpending].sort((a, b) => b.totalVariance - a.totalVariance)[0];
+  const sum = (pick: (m: MonthSummary) => number, months = monthsWithSpending) => months.reduce((total, m) => total + pick(m), 0);
+
+  // Budgets apply to variable spending only; fixed costs are reported as they are
+  const fixedTotal = sum(m => m.fixedActual);
+  const variableTotal = sum(m => m.variableActual);
+  const variableBudget = sum(m => m.variableBudget);
+  const variableVariance = variableTotal - variableBudget;
+  const totalActual = sum(m => m.totalActual);
+  const activeMonths = monthsWithSpending.length || 1;
+
+  const bestMonth = [...monthsWithSpending].sort((a, b) => a.variableVariance - b.variableVariance)[0];
+  const worstMonth = [...monthsWithSpending].sort((a, b) => b.variableVariance - a.variableVariance)[0];
 
   return (
     <div className="space-y-4">
@@ -41,37 +44,48 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
       <Card>
         <CardHeader>
           <CardTitle>{year} Overview</CardTitle>
-          <CardDescription>Annual budget summary and performance</CardDescription>
+          <CardDescription>Fixed costs and variable spending against its budget</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Metric</TableHead>
-                <TableHead className="text-right">Annual Budget</TableHead>
-                <TableHead className="text-right">Total Spent</TableHead>
+                <TableHead></TableHead>
+                <TableHead className="text-right">Budget</TableHead>
+                <TableHead className="text-right">Spent</TableHead>
+                <TableHead className="text-right">Average/Month</TableHead>
                 <TableHead className="text-right">Variance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell className="font-semibold">Total</TableCell>
-                <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(totalBudget)}</TableCell>
-                <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(totalActual)}</TableCell>
-                <TableCell className={cn('text-right font-bold tabular-nums', varianceClass(totalVariance))}>
-                  {totalVariance > 0 ? '+' : ''}{formatCurrency(totalVariance)}
+                <TableCell className="font-semibold">Fixed costs</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(fixedTotal)}</TableCell>
+                <TableCell className="text-right text-muted-foreground tabular-nums">{formatCurrency(fixedTotal / activeMonths)}</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-semibold">Variable spending</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(variableBudget)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(variableTotal)}</TableCell>
+                <TableCell className="text-right text-muted-foreground tabular-nums">{formatCurrency(variableTotal / activeMonths)}</TableCell>
+                <TableCell className={cn('text-right font-bold tabular-nums', varianceClass(variableVariance))}>
+                  {variableVariance > 0 ? '+' : ''}{formatCurrency(variableVariance)}
                 </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="font-semibold">Average/Month</TableCell>
-                <TableCell className="text-right text-muted-foreground tabular-nums">{formatCurrency(avgMonthlyBudget)}</TableCell>
-                <TableCell className="text-right text-muted-foreground tabular-nums">{formatCurrency(avgMonthlyActual)}</TableCell>
-                <TableCell className="text-right text-muted-foreground">
-                  {totalVariance <= 0 ? 'Under budget' : 'Over budget'}
-                </TableCell>
+                <TableCell className="font-semibold">All spending</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">{formatCurrency(totalActual)}</TableCell>
+                <TableCell className="text-right text-muted-foreground tabular-nums">{formatCurrency(totalActual / activeMonths)}</TableCell>
+                <TableCell className="text-right text-muted-foreground">—</TableCell>
               </TableRow>
             </TableBody>
           </Table>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Totals cover the {monthsWithSpending.length} month{monthsWithSpending.length === 1 ? '' : 's'} with spending recorded. Fixed costs have no budget.
+          </p>
         </CardContent>
       </Card>
 
@@ -95,19 +109,19 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">
-                    {bestMonth.totalVariance > 0 ? 'Over Budget' : 'Under Budget'}
+                    {bestMonth.variableVariance > 0 ? 'Over Budget' : 'Under Budget'}
                   </div>
-                  <div className={`text-xl font-bold ${bestMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
-                    {formatCurrency(Math.abs(bestMonth.totalVariance))}
+                  <div className={`text-xl font-bold ${bestMonth.variableVariance > 0 ? 'text-destructive' : 'text-success'}`}>
+                    {formatCurrency(Math.abs(bestMonth.variableVariance))}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Budget</div>
-                  <div className="text-base font-semibold">{formatCurrency(bestMonth.totalBudget)}</div>
+                  <div className="text-sm text-muted-foreground mb-1">Variable budget</div>
+                  <div className="text-base font-semibold">{formatCurrency(bestMonth.variableBudget)}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Spent</div>
-                  <div className="text-base font-semibold">{formatCurrency(bestMonth.totalActual)}</div>
+                  <div className="text-sm text-muted-foreground mb-1">Variable spent</div>
+                  <div className="text-base font-semibold">{formatCurrency(bestMonth.variableActual)}</div>
                 </div>
               </div>
             )}
@@ -132,19 +146,19 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">
-                    {worstMonth.totalVariance > 0 ? 'Over Budget' : 'Under Budget'}
+                    {worstMonth.variableVariance > 0 ? 'Over Budget' : 'Under Budget'}
                   </div>
-                  <div className={`text-xl font-bold ${worstMonth.totalVariance > 0 ? 'text-destructive' : 'text-success'}`}>
-                    {formatCurrency(Math.abs(worstMonth.totalVariance))}
+                  <div className={`text-xl font-bold ${worstMonth.variableVariance > 0 ? 'text-destructive' : 'text-success'}`}>
+                    {formatCurrency(Math.abs(worstMonth.variableVariance))}
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Budget</div>
-                  <div className="text-base font-semibold">{formatCurrency(worstMonth.totalBudget)}</div>
+                  <div className="text-sm text-muted-foreground mb-1">Variable budget</div>
+                  <div className="text-base font-semibold">{formatCurrency(worstMonth.variableBudget)}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-muted-foreground mb-1">Spent</div>
-                  <div className="text-base font-semibold">{formatCurrency(worstMonth.totalActual)}</div>
+                  <div className="text-sm text-muted-foreground mb-1">Variable spent</div>
+                  <div className="text-base font-semibold">{formatCurrency(worstMonth.variableActual)}</div>
                 </div>
               </div>
             )}
@@ -156,37 +170,41 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
       <Card>
         <CardHeader>
           <CardTitle>Monthly Breakdown</CardTitle>
-          <CardDescription>Detailed month-by-month performance</CardDescription>
+          <CardDescription>Fixed costs, and variable spending against its budget. Status is judged on variable spending.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Month</TableHead>
-                <TableHead className="text-right">Budget</TableHead>
-                <TableHead className="text-right">Actual</TableHead>
+                <TableHead className="text-right">Fixed Costs</TableHead>
+                <TableHead className="text-right">Variable Spent</TableHead>
+                <TableHead className="text-right">Variable Budget</TableHead>
                 <TableHead className="text-right">Variance</TableHead>
                 <TableHead className="text-right">% Used</TableHead>
+                <TableHead className="text-right">All Spending</TableHead>
                 <TableHead className="text-center">Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {yearData.map((month) => {
-                const percentUsed = month.totalBudget > 0
-                  ? (month.totalActual / month.totalBudget) * 100
+                const percentUsed = month.variableBudget > 0
+                  ? (month.variableActual / month.variableBudget) * 100
                   : 0;
                 const status = getStatus(month.totalActual, percentUsed);
+                const hasData = month.totalActual > 0;
 
                 return (
                   <TableRow key={month.month}>
                     <TableCell className="font-semibold">{getMonthName(month.month)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(month.totalBudget)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrency(month.totalActual)}</TableCell>
-                    <TableCell className={cn('text-right font-semibold tabular-nums', varianceClass(month.totalVariance))}>
-                      {month.totalVariance > 0 ? '+' : ''}
-                      {formatCurrency(month.totalVariance)}
+                    <TableCell className="text-right tabular-nums">{formatCurrency(month.fixedActual)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(month.variableActual)}</TableCell>
+                    <TableCell className="text-right text-muted-foreground tabular-nums">{formatCurrency(month.variableBudget)}</TableCell>
+                    <TableCell className={cn('text-right font-semibold tabular-nums', hasData ? varianceClass(month.variableVariance) : 'text-muted-foreground')}>
+                      {hasData ? `${month.variableVariance > 0 ? '+' : ''}${formatCurrency(month.variableVariance)}` : '—'}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{percentUsed.toFixed(1)}%</TableCell>
+                    <TableCell className="text-right tabular-nums">{hasData ? `${percentUsed.toFixed(1)}%` : '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrency(month.totalActual)}</TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline" className={status.className}>{status.label}</Badge>
                     </TableCell>
@@ -197,15 +215,17 @@ export const YearlyDashboard: React.FC<YearlyDashboardProps> = ({ year, yearData
             <TableFooter>
               <TableRow className="text-base font-bold hover:bg-transparent">
                 <TableCell>Total</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCurrency(totalBudget)}</TableCell>
-                <TableCell className="text-right tabular-nums">{formatCurrency(totalActual)}</TableCell>
-                <TableCell className={cn('text-right tabular-nums', varianceClass(totalVariance))}>
-                  {totalVariance > 0 ? '+' : ''}
-                  {formatCurrency(totalVariance)}
+                <TableCell className="text-right tabular-nums">{formatCurrency(fixedTotal)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(variableTotal)}</TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(variableBudget)}</TableCell>
+                <TableCell className={cn('text-right tabular-nums', varianceClass(variableVariance))}>
+                  {variableVariance > 0 ? '+' : ''}
+                  {formatCurrency(variableVariance)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {totalBudget > 0 ? ((totalActual / totalBudget) * 100).toFixed(1) : 0}%
+                  {variableBudget > 0 ? ((variableTotal / variableBudget) * 100).toFixed(1) : 0}%
                 </TableCell>
+                <TableCell className="text-right tabular-nums">{formatCurrency(totalActual)}</TableCell>
                 <TableCell />
               </TableRow>
             </TableFooter>
