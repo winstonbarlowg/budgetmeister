@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, RefreshCw, CalendarCheck } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, CalendarCheck, RotateCcw } from 'lucide-react';
 import { MonthData, Category, MonthSummary, BudgetConfig, IncomeSource, MonthlyExpense } from '../types';
-import { calculateMonthSummary, formatCurrency, normalizeExpense, updateExpenseAmount, getMinimumExpenseAmount } from '../utils/calculations';
+import {
+  calculateMonthSummary, formatCurrency, normalizeExpense, updateExpenseAmount,
+  getEffectiveExpenses, isAutoFillActive,
+} from '../utils/calculations';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
@@ -20,6 +22,14 @@ interface MonthlyEntryProps {
   onMonthChange: (year: number, month: number) => void;
 }
 
+const emptyExpense = (categoryId: string): MonthlyExpense => ({
+  categoryId,
+  actualAmount: 0,
+  importedAmount: 0,
+  manualAmount: 0,
+  linkedTransactionIds: [],
+});
+
 export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   categories,
   incomeSources,
@@ -28,64 +38,34 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   onSave,
   onMonthChange,
 }) => {
-  const [expenses, setExpenses] = useState<{ [categoryId: string]: number }>({});
-  const [expenseDetails, setExpenseDetails] = useState<{ [categoryId: string]: MonthlyExpense }>({});
+  // Saved amounts plus auto-fill defaults from Settings, derived on every render
+  const effectiveById = new Map(getEffectiveExpenses(categories, monthData).map(e => [e.categoryId, e]));
+  const savedById = new Map(monthData.expenses.map(e => [e.categoryId, normalizeExpense(e) as MonthlyExpense]));
 
-  useEffect(() => {
-    const expenseMap: { [categoryId: string]: number } = {};
-    const detailsMap: { [categoryId: string]: MonthlyExpense } = {};
-
-    monthData.expenses.forEach((expense) => {
-      const normalized = normalizeExpense(expense);
-      expenseMap[expense.categoryId] = normalized.actualAmount;
-      detailsMap[expense.categoryId] = normalized;
-    });
-
-    setExpenses(expenseMap);
-    setExpenseDetails(detailsMap);
-  }, [monthData]);
-
-  // Every edit is saved straight away
-  const saveExpenses = (updatedExpenses: { [categoryId: string]: number }) => {
-    setExpenses(updatedExpenses);
-    onSave({
-      ...monthData,
-      expenses: categories.map((category) => {
-        const currentDetail = expenseDetails[category.id] || {
-          categoryId: category.id,
-          actualAmount: 0,
-          importedAmount: 0,
-          manualAmount: 0,
-          linkedTransactionIds: []
-        };
-        return updateExpenseAmount(currentDetail, updatedExpenses[category.id] || 0);
-      }),
-    });
+  const saveExpense = (expense: MonthlyExpense | null, categoryId: string) => {
+    const others = monthData.expenses.filter(e => e.categoryId !== categoryId);
+    onSave({ ...monthData, expenses: expense ? [...others, expense] : others });
   };
 
-  const handleExpenseChange = (categoryId: string, amount: number) => {
-    const currentDetail = expenseDetails[categoryId] || {
-      categoryId,
-      actualAmount: 0,
-      importedAmount: 0,
-      manualAmount: 0,
-      linkedTransactionIds: []
-    };
-
-    const minimum = getMinimumExpenseAmount(currentDetail);
-    const safeAmount = Math.max(amount, minimum);
-
-    saveExpenses({ ...expenses, [categoryId]: safeAmount });
+  // Each edit is saved straight away as this month's amount for that category
+  const handleExpenseChange = (category: Category, amount: number) => {
+    const current = savedById.get(category.id) || emptyExpense(category.id);
+    const updated = updateExpenseAmount(current, amount);
+    const autoFill = isAutoFillActive(category, monthData.year, monthData.month);
+    // Typing the default amount back in means there is nothing to override any more
+    if (autoFill && !updated.importedAmount && Math.abs(updated.actualAmount - category.budgetAmount) < 0.005) {
+      handleUseDefault(category.id);
+      return;
+    }
+    saveExpense({ ...updated, ...(autoFill ? { manualOverride: true } : {}) }, category.id);
   };
 
-  const handleApplyFixedDefaults = () => {
-    const updatedExpenses = { ...expenses };
-    categories
-      .filter(cat => cat.type === 'fixed')
-      .forEach(cat => {
-        updatedExpenses[cat.id] = cat.budgetAmount;
-      });
-    saveExpenses(updatedExpenses);
+  const handleUseDefault = (categoryId: string) => {
+    const current = savedById.get(categoryId);
+    if (!current) return;
+    const { manualOverride: _manualOverride, ...rest } = current;
+    const cleared = { ...rest, manualAmount: 0, actualAmount: current.importedAmount || 0 };
+    saveExpense(cleared.importedAmount ? cleared : null, categoryId);
   };
 
   const handlePrevMonth = () => {
@@ -119,26 +99,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
     onMonthChange(today.getFullYear(), today.getMonth() + 1);
   };
 
-  const summary: MonthSummary = calculateMonthSummary(
-    config,
-    {
-      year: monthData.year,
-      month: monthData.month,
-      expenses: categories.map(c => {
-        const currentDetail = expenseDetails[c.id] || {
-          categoryId: c.id,
-          actualAmount: 0,
-          importedAmount: 0,
-          manualAmount: 0,
-          linkedTransactionIds: []
-        };
-        const newActualAmount = expenses[c.id] || 0;
-        return updateExpenseAmount(currentDetail, newActualAmount);
-      }),
-      income: monthData.income || [],
-      moneyMovements: monthData.moneyMovements || []
-    }
-  );
+  const summary: MonthSummary = calculateMonthSummary(config, monthData);
 
   const fixedCategories = summary.categories.filter((c) => c.type === 'fixed');
   const variableCategories = summary.categories.filter((c) => c.type === 'variable');
@@ -274,29 +235,16 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
         {/* Fixed Expenses */}
         <Card>
           <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle>Fixed Expenses</CardTitle>
-                <CardDescription>
-                  {formatCurrency(summary.fixedActual)} / {formatCurrency(summary.fixedBudget)}
-                </CardDescription>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleApplyFixedDefaults}
-                className="gap-1"
-              >
-                <RefreshCw className="h-3 w-3" />
-                Apply Defaults
-              </Button>
-            </div>
+            <CardTitle>Fixed Expenses</CardTitle>
+            <CardDescription>
+              {formatCurrency(summary.fixedActual)} / {formatCurrency(summary.fixedBudget)}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {fixedCategories.map((category) => {
-              const detail = expenseDetails[category.id];
-              const hasImports = detail && (detail.importedAmount || 0) > 0;
-              const minimum = detail ? getMinimumExpenseAmount(detail) : 0;
+              const detail = effectiveById.get(category.id);
+              const hasImports = (detail?.importedAmount || 0) > 0;
+              const minimum = detail?.importedAmount || 0;
 
               return (
                 <div key={category.id}>
@@ -314,17 +262,27 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                           Budget: {formatCurrency(category.budgetAmount)}
                           {hasImports && (
                             <span className="ml-1 text-info font-medium">
-                              • {formatCurrency(detail.importedAmount || 0)} imported
+                              • {formatCurrency(detail?.importedAmount || 0)} imported
                             </span>
+                          )}
+                          {detail?.isDefault && <span className="ml-1">• Default from Settings</span>}
+                          {detail?.manualOverride && isAutoFillActive(category, monthData.year, monthData.month) && (
+                            <button
+                              type="button"
+                              onClick={() => handleUseDefault(category.id)}
+                              className="ml-1 inline-flex items-center gap-0.5 text-info hover:underline"
+                            >
+                              • <RotateCcw className="h-3 w-3" /> Use default
+                            </button>
                           )}
                         </p>
                       </div>
                     </div>
                     <CurrencyInput
                       id={category.id}
-                      value={expenses[category.id] || 0}
-                      onChange={(value) => handleExpenseChange(category.id, value)}
-                      className="w-32"
+                      value={detail?.actualAmount || 0}
+                      onChange={(value) => handleExpenseChange(category, value)}
+                      className={detail?.isDefault ? 'w-32 text-muted-foreground' : 'w-32'}
                       min={minimum}
                     />
                   </div>
@@ -352,9 +310,9 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
           </CardHeader>
           <CardContent className="space-y-3">
             {variableCategories.map((category) => {
-              const detail = expenseDetails[category.id];
-              const hasImports = detail && (detail.importedAmount || 0) > 0;
-              const minimum = detail ? getMinimumExpenseAmount(detail) : 0;
+              const detail = effectiveById.get(category.id);
+              const hasImports = (detail?.importedAmount || 0) > 0;
+              const minimum = detail?.importedAmount || 0;
 
               return (
                 <div key={category.id} className="space-y-1.5">
@@ -372,7 +330,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                           Budget: {formatCurrency(category.budgetAmount)}
                           {hasImports && (
                             <span className="ml-1 text-info font-medium">
-                              • {formatCurrency(detail.importedAmount || 0)} imported
+                              • {formatCurrency(detail?.importedAmount || 0)} imported
                             </span>
                           )}
                         </p>
@@ -380,8 +338,8 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                     </div>
                     <CurrencyInput
                       id={category.id}
-                      value={expenses[category.id] || 0}
-                      onChange={(value) => handleExpenseChange(category.id, value)}
+                      value={detail?.actualAmount || 0}
+                      onChange={(value) => handleExpenseChange(category, value)}
                       className="w-32"
                       min={minimum}
                     />

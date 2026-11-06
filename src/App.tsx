@@ -8,7 +8,7 @@ import { BankTransactions } from './components/BankTransactions';
 import { MonthTransactions } from './components/MonthTransactions';
 import { fileSystemManager } from './utils/fileSystem';
 import { calculateMonthSummary } from './utils/calculations';
-import { BudgetConfig, MonthData, MonthSummary, CategorizedTransaction } from './types';
+import { BudgetConfig, CategoryRule, MonthData, MonthSummary, CategorizedTransaction } from './types';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 import { Toaster } from './components/ui/sonner';
@@ -48,19 +48,22 @@ function App() {
       const loadedConfig = await fileSystemManager.loadConfig();
       setConfig(loadedConfig);
 
+      // Categorise anything imported since the app last ran
+      await fileSystemManager.applyRulesEverywhere(loadedConfig.categoryRules || []);
+
       const loadedMonthData = await fileSystemManager.loadMonthData(currentYear, currentMonth);
       setMonthData(loadedMonthData);
 
-      await loadYearData();
+      await loadYearData(undefined, loadedConfig);
     } catch (err) {
       console.error('Failed to load data:', err);
     }
   };
 
-  const loadYearData = async (year?: number) => {
+  const loadYearData = async (year?: number, configOverride?: BudgetConfig) => {
     try {
       const targetYear = year || currentYear;
-      const loadedConfig = config || await fileSystemManager.loadConfig();
+      const loadedConfig = configOverride || config || await fileSystemManager.loadConfig();
       const yearlyData = await fileSystemManager.loadYearData(targetYear);
 
       const summaries: MonthSummary[] = [];
@@ -81,10 +84,38 @@ function App() {
       const newConfig = { ...updatedConfig, lastModified: new Date().toISOString() };
       await fileSystemManager.saveConfig(newConfig);
       setConfig(newConfig);
-      await loadYearData();
+      await loadYearData(undefined, newConfig);
     } catch (err) {
       console.error('Failed to save config:', err);
     }
+  };
+
+  // Save the rule list, then re-categorise every month to match it
+  const handleSaveRules = async (categoryRules: CategoryRule[]) => {
+    if (!config) return;
+    const newConfig = { ...config, categoryRules, lastModified: new Date().toISOString() };
+    try {
+      await fileSystemManager.saveConfig(newConfig);
+      setConfig(newConfig);
+      const result = await fileSystemManager.applyRulesEverywhere(categoryRules);
+      setMonthData(await fileSystemManager.loadMonthData(currentYear, currentMonth));
+      await loadYearData(undefined, newConfig);
+      toast.success(
+        result.transactions === 0
+          ? 'Rules saved. No transactions needed changing.'
+          : `Updated ${result.transactions} transaction${result.transactions === 1 ? '' : 's'} in ${result.months} month${result.months === 1 ? '' : 's'}.`
+      );
+    } catch (err) {
+      console.error('Failed to save rules:', err);
+      toast.error('Could not save the rule.');
+    }
+  };
+
+  const handleSaveRule = (rule: CategoryRule) => {
+    const rules = config?.categoryRules || [];
+    return handleSaveRules(
+      rules.some(r => r.id === rule.id) ? rules.map(r => (r.id === rule.id ? rule : r)) : [...rules, rule]
+    );
   };
 
   // Edits on the Monthly page save as they happen, so show them before the write finishes
@@ -268,7 +299,9 @@ function App() {
               <MonthTransactions
                 categories={config.categories}
                 monthData={monthData}
+                rules={config.categoryRules || []}
                 onSave={handleSaveMonthData}
+                onSaveRule={handleSaveRule}
               />
             </div>
           )}
@@ -390,6 +423,9 @@ function App() {
               <SettingsManager
                 categories={config.categories}
                 incomeSources={config.incomeSources}
+                rules={config.categoryRules || []}
+                onSaveRules={handleSaveRules}
+                onSaveRule={handleSaveRule}
                 onSaveCategories={(categories) => handleSaveConfig({ ...config, categories })}
                 onSaveIncomeSources={(incomeSources) => handleSaveConfig({ ...config, incomeSources })}
               />

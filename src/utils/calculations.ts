@@ -1,11 +1,12 @@
-import { BudgetConfig, MonthData, MonthSummary, CategoryWithActual, IncomeSource, MonthlyIncome, IncomeWithSource } from '../types';
+import { BudgetConfig, Category, EffectiveExpense, MonthData, MonthSummary, CategoryWithActual, IncomeSource, MonthlyIncome, IncomeWithSource } from '../types';
 
 export function calculateMonthSummary(
   config: BudgetConfig,
   monthData: MonthData
 ): MonthSummary {
+  const expenses = getEffectiveExpenses(config.categories, monthData);
   const categories: CategoryWithActual[] = config.categories.map((category) => {
-    const expense = monthData.expenses.find((e) => e.categoryId === category.id);
+    const expense = expenses.find((e) => e.categoryId === category.id);
     const actualAmount = expense?.actualAmount || 0;
     const variance = actualAmount - category.budgetAmount;
     const percentUsed = category.budgetAmount > 0
@@ -139,6 +140,55 @@ export function getEffectiveIncome(
   const defaults = getSuggestedIncome(incomeSources, monthData.year, monthData.month)
     .filter(s => !savedIds.has(s.sourceId));
   return [...saved, ...defaults];
+}
+
+const toMonthKey = (year: number, month: number) => `${year}-${month.toString().padStart(2, '0')}`;
+
+/**
+ * Whether a fixed category fills in its budget amount for this month: auto-fill is on,
+ * the month is inside its From–Until range, and the month has started.
+ */
+export function isAutoFillActive(category: Category, year: number, month: number, today = new Date()): boolean {
+  if (category.type !== 'fixed' || !category.autoFill) return false;
+  const target = toMonthKey(year, month);
+  return (
+    target <= toMonthKey(today.getFullYear(), today.getMonth() + 1) &&
+    (!category.activeFrom || target >= category.activeFrom) &&
+    (!category.activeUntil || target <= category.activeUntil)
+  );
+}
+
+/**
+ * Expenses for a month: amounts saved for that month win, and auto-fill categories
+ * with nothing imported or typed fall back to their budget amount from Settings.
+ */
+export function getEffectiveExpenses(
+  categories: Category[],
+  monthData: Pick<MonthData, 'year' | 'month' | 'expenses'>,
+  today = new Date()
+): EffectiveExpense[] {
+  const saved = new Map(monthData.expenses.map(e => [e.categoryId, normalizeExpense(e)]));
+  const effective: EffectiveExpense[] = monthData.expenses.map(e => ({ ...saved.get(e.categoryId), isDefault: false }));
+
+  categories
+    .filter(category => isAutoFillActive(category, monthData.year, monthData.month, today))
+    .forEach(category => {
+      const expense = saved.get(category.id);
+      if (expense && (expense.manualOverride || expense.importedAmount > 0 || expense.manualAmount > 0)) return;
+      const filled: EffectiveExpense = {
+        categoryId: category.id,
+        actualAmount: category.budgetAmount,
+        importedAmount: 0,
+        manualAmount: 0,
+        linkedTransactionIds: [],
+        isDefault: true,
+      };
+      const index = effective.findIndex(e => e.categoryId === category.id);
+      if (index >= 0) effective[index] = filled;
+      else effective.push(filled);
+    });
+
+  return effective;
 }
 
 export function validateIncomeAmounts(

@@ -1,4 +1,5 @@
-import { BudgetConfig, MonthData, YearlyData, TransactionConfig, CategorizationRule, ImportSession } from '../types';
+import { BudgetConfig, CategoryRule, MonthData, YearlyData, TransactionConfig, CategorizationRule, ImportSession } from '../types';
+import { applyRulesToMonth } from './categoryRules';
 
 const DEFAULT_CATEGORIES: BudgetConfig = {
   categories: [
@@ -194,6 +195,43 @@ export class FileSystemManager {
     }
 
     return yearData;
+  }
+
+  /** Every month that has a file, oldest first */
+  async listMonths(): Promise<{ year: number; month: number }[]> {
+    if (!this.budgetDataHandle) {
+      throw new Error('Directory not initialized');
+    }
+
+    const months: { year: number; month: number }[] = [];
+    for await (const yearEntry of this.budgetDataHandle.values()) {
+      if (yearEntry.kind !== 'directory' || !/^\d{4}$/.test(yearEntry.name)) continue;
+      for await (const monthEntry of yearEntry.values()) {
+        const match = monthEntry.kind === 'file' && monthEntry.name.match(/^(\d{2})-[a-z]+\.json$/);
+        if (match) months.push({ year: Number(yearEntry.name), month: Number(match[1]) });
+      }
+    }
+    return months.sort((a, b) => a.year - b.year || a.month - b.month);
+  }
+
+  async loadAllMonths(): Promise<MonthData[]> {
+    const months = await this.listMonths();
+    return Promise.all(months.map(({ year, month }) => this.loadMonthData(year, month)));
+  }
+
+  /** Apply category rules to every month, saving only the months that change */
+  async applyRulesEverywhere(rules: CategoryRule[]): Promise<{ transactions: number; months: number }> {
+    let transactions = 0;
+    let months = 0;
+    for (const monthData of await this.loadAllMonths()) {
+      const result = applyRulesToMonth(monthData, rules);
+      if (result.changedCount > 0) {
+        await this.saveMonthData(result.monthData);
+        transactions += result.changedCount;
+        months++;
+      }
+    }
+    return { transactions, months };
   }
 
   isInitialized(): boolean {

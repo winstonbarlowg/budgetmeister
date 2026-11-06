@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from './ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Checkbox } from './ui/checkbox';
 import { useConfirm } from './ui/confirm-dialog';
 import { ColorSwatchPicker } from './ColorSwatchPicker';
 import { MoneyInput } from './MoneyInput';
+import { MonthPickerField } from './MonthPicker';
 import { formatCurrency } from '../utils/calculations';
 
 interface CategoryManagerProps {
@@ -34,6 +36,19 @@ type CategoryFormValues = {
   type: 'fixed' | 'variable';
   budgetAmount: number;
   color: string;
+  autoFill: boolean;
+  activeFrom: string;
+  activeUntil: string;
+};
+
+const formatMonth = (value: string) =>
+  new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1).toLocaleString('en', { month: 'short', year: 'numeric' });
+
+const describeAutoFill = (category: Category) => {
+  if (category.type !== 'fixed' || !category.autoFill) return null;
+  const from = category.activeFrom ? `from ${formatMonth(category.activeFrom)}` : 'every month';
+  const until = category.activeUntil ? ` to ${formatMonth(category.activeUntil)}` : '';
+  return `Auto-fills ${from}${until}`;
 };
 
 export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, onSave }) => {
@@ -57,6 +72,12 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
     type: z.enum(['fixed', 'variable']),
     budgetAmount: z.number().min(0, 'Must be zero or more'),
     color: z.string(),
+    autoFill: z.boolean(),
+    activeFrom: z.string(),
+    activeUntil: z.string(),
+  }).refine(v => !v.activeFrom || !v.activeUntil || v.activeUntil >= v.activeFrom, {
+    message: 'Must be after the start month',
+    path: ['activeUntil'],
   });
 
   const schemaRef = useRef(categorySchema);
@@ -64,7 +85,10 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
 
   const form = useForm<CategoryFormValues>({
     resolver: (values, context, options) => zodResolver(schemaRef.current)(values, context, options),
-    defaultValues: { name: '', type: 'variable', budgetAmount: 0, color: PRESET_COLORS[0] },
+    defaultValues: {
+      name: '', type: 'variable', budgetAmount: 0, color: PRESET_COLORS[0],
+      autoFill: false, activeFrom: '', activeUntil: '',
+    },
   });
 
   const handleAdd = () => {
@@ -74,6 +98,9 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
       type: 'variable',
       budgetAmount: 0,
       color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
+      autoFill: false,
+      activeFrom: '',
+      activeUntil: '',
     });
     setIsModalOpen(true);
   };
@@ -85,6 +112,9 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
       type: category.type,
       budgetAmount: category.budgetAmount,
       color: category.color || PRESET_COLORS[0],
+      autoFill: !!category.autoFill,
+      activeFrom: category.activeFrom || '',
+      activeUntil: category.activeUntil || '',
     });
     setIsModalOpen(true);
   };
@@ -102,7 +132,16 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
   };
 
   const handleSubmit = (values: CategoryFormValues) => {
-    const data = { ...values, name: values.name.trim() };
+    const { autoFill, activeFrom, activeUntil, ...rest } = values;
+    // Auto-fill only applies to fixed categories
+    const fillsIn = rest.type === 'fixed' && autoFill;
+    const data: Omit<Category, 'id'> = {
+      ...rest,
+      name: rest.name.trim(),
+      autoFill: fillsIn || undefined,
+      activeFrom: fillsIn && activeFrom ? activeFrom : undefined,
+      activeUntil: fillsIn && activeUntil ? activeUntil : undefined,
+    };
 
     if (editingCategory) {
       onSave(
@@ -165,6 +204,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                       <div className="font-medium">{category.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {formatCurrency(category.budgetAmount)} per month
+                        {describeAutoFill(category) && ` • ${describeAutoFill(category)}`}
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -217,6 +257,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                       <div className="font-medium">{category.name}</div>
                       <div className="text-xs text-muted-foreground">
                         {formatCurrency(category.budgetAmount)} per month
+                        {describeAutoFill(category) && ` • ${describeAutoFill(category)}`}
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -325,6 +366,59 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ categories, on
                 </FormItem>
               )}
             />
+
+            {form.watch('type') === 'fixed' && (
+              <div className="space-y-3 rounded-lg border p-3">
+                <FormField
+                  control={form.control}
+                  name="autoFill"
+                  render={({ field }) => (
+                    <FormItem className="flex items-start gap-2 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={checked => field.onChange(checked === true)} />
+                      </FormControl>
+                      <div className="space-y-0.5">
+                        <FormLabel className="font-normal">Fill in the monthly budget automatically</FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                          For months with no transaction in this category, e.g. payments from accounts not in Emma.
+                          You can still type a different amount for a month.
+                        </p>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                {form.watch('autoFill') && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="activeFrom"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>From</FormLabel>
+                          <FormControl>
+                            <MonthPickerField value={field.value} onChange={field.onChange} placeholder="All months" clearable />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="activeUntil"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Until</FormLabel>
+                          <FormControl>
+                            <MonthPickerField value={field.value} onChange={field.onChange} placeholder="Ongoing" clearable />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             <FormField
               control={form.control}

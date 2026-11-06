@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { ChevronDown, Search } from 'lucide-react';
-import { Category, MonthData, MonthTransaction } from '../types';
+import { ChevronDown, PenLine, Search, Wand2 } from 'lucide-react';
+import { Category, CategoryRule, MonthData, MonthTransaction } from '../types';
 import { formatCurrency, getMonthName } from '../utils/calculations';
 import {
   INCOME_CATEGORY_ID,
@@ -10,6 +10,8 @@ import {
   signedAmount,
   updateTransaction,
 } from '../utils/monthTransactions';
+import { createRuleId, isManuallyCategorised, previewRule, transactionKey } from '../utils/categoryRules';
+import { fileSystemManager } from '../utils/fileSystem';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -17,11 +19,14 @@ import { Checkbox } from './ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { RuleDialog } from './RuleDialog';
 
 interface MonthTransactionsProps {
   categories: Category[];
   monthData: MonthData;
+  rules: CategoryRule[];
   onSave: (data: MonthData) => Promise<void>;
+  onSaveRule: (rule: CategoryRule) => Promise<void>;
 }
 
 const ACCOUNT_BADGE_STYLES: Record<string, string> = {
@@ -34,13 +39,16 @@ type StatusFilter = 'all' | 'included' | 'excluded';
 export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
   categories,
   monthData,
+  rules,
   onSave,
+  onSaveRule,
 }) => {
   const [accountFilter, setAccountFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
+  const [ruleDraft, setRuleDraft] = useState<{ rule: CategoryRule; amount: number } | null>(null);
 
   const transactions = monthData.transactions || [];
   const accounts = useMemo(() => [...new Set(transactions.map(t => t.account))].sort(), [transactions]);
@@ -62,15 +70,37 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
   const excludedCount = transactions.filter(t => t.excluded).length;
   const filteredTotal = filtered.filter(countsAsExpense).reduce((sum, t) => sum + signedAmount(t), 0);
 
-  const handleCategoryChange = (transaction: MonthTransaction, categoryId: string) => {
-    onSave(updateTransaction(monthData, transaction.id, { categoryId }));
+  const rulesById = new Map(rules.map(rule => [rule.id, rule]));
+
+  // Offer a rule when other months have transactions from the same merchant that it would cover
+  const offerRule = async (transaction: MonthTransaction, target: Pick<CategoryRule, 'categoryId' | 'exclude'>) => {
+    const rule: CategoryRule = {
+      id: createRuleId(),
+      text: transactionKey(transaction),
+      direction: transaction.direction,
+      ...target,
+      createdAt: new Date().toISOString(),
+    };
+    if (!rule.text) return;
+    const months = await fileSystemManager.loadAllMonths();
+    if (previewRule(rule, rules, months).matches > 0) {
+      setRuleDraft({ rule, amount: transaction.amount });
+    }
   };
 
-  const handleIncludeToggle = (transaction: MonthTransaction, included: boolean) => {
-    onSave(updateTransaction(monthData, transaction.id, {
+  const handleCategoryChange = async (transaction: MonthTransaction, categoryId: string) => {
+    await onSave(updateTransaction(monthData, transaction.id, { categoryId }));
+    await offerRule(transaction, { categoryId });
+  };
+
+  const handleIncludeToggle = async (transaction: MonthTransaction, included: boolean) => {
+    await onSave(updateTransaction(monthData, transaction.id, {
       excluded: !included,
       excludeReason: included ? undefined : 'Excluded manually',
     }));
+    if (!included) {
+      await offerRule(transaction, { categoryId: null, exclude: true });
+    }
   };
 
   if (transactions.length === 0) {
@@ -78,148 +108,172 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
   }
 
   return (
-    <Collapsible open={open} onOpenChange={setOpen} asChild>
-      <Card>
-        <CollapsibleTrigger asChild>
-          <button type="button" className="flex w-full items-center justify-between gap-4 rounded-xl text-left hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <CardHeader>
-              <CardTitle>Transactions</CardTitle>
-              <CardDescription>
-                {transactions.length} transactions in {getMonthName(monthData.month)} {monthData.year} •{' '}
-                {formatCurrency(countedTotal)} counted towards expenses • {excludedCount} excluded
-              </CardDescription>
-            </CardHeader>
-            <span className="mr-4 flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-              {open ? 'Hide' : 'Show'}
-              <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
-            </span>
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="space-y-3">
-            {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex gap-1">
-                {['all', ...accounts].map(account => (
-                  <Button
-                    key={account}
-                    size="sm"
-                    variant={accountFilter === account ? 'default' : 'outline'}
-                    onClick={() => setAccountFilter(account)}
-                  >
-                    {account === 'all' ? 'All accounts' : account}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex gap-1">
-                {(['all', 'included', 'excluded'] as StatusFilter[]).map(status => (
-                  <Button
-                    key={status}
-                    size="sm"
-                    variant={statusFilter === status ? 'default' : 'outline'}
-                    onClick={() => setStatusFilter(status)}
-                  >
-                    {status === 'all' ? 'All' : status === 'included' ? 'Included' : 'Excluded'}
-                  </Button>
-                ))}
-              </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px] h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  <SelectItem value="uncategorised">Uncategorised</SelectItem>
-                  {categories.map(category => (
-                    <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+    <>
+      <Collapsible open={open} onOpenChange={setOpen} asChild>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <button type="button" className="flex w-full items-center justify-between gap-4 rounded-xl text-left hover:bg-muted/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <CardHeader>
+                <CardTitle>Transactions</CardTitle>
+                <CardDescription>
+                  {transactions.length} transactions in {getMonthName(monthData.month)} {monthData.year} •{' '}
+                  {formatCurrency(countedTotal)} counted towards expenses • {excludedCount} excluded
+                </CardDescription>
+              </CardHeader>
+              <span className="mr-4 flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                {open ? 'Hide' : 'Show'}
+                <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+              </span>
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-3">
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex gap-1">
+                  {['all', ...accounts].map(account => (
+                    <Button
+                      key={account}
+                      size="sm"
+                      variant={accountFilter === account ? 'default' : 'outline'}
+                      onClick={() => setAccountFilter(account)}
+                    >
+                      {account === 'all' ? 'All accounts' : account}
+                    </Button>
                   ))}
-                  <SelectItem value={INCOME_CATEGORY_ID}>Income</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="relative flex-1 min-w-[180px]">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  placeholder="Search transactions"
-                  className="pl-9 h-8"
-                />
-              </div>
-            </div>
-
-            {filtered.length !== transactions.length && (
-              <p className="text-xs text-muted-foreground">
-                Showing {filtered.length} of {transactions.length} • {formatCurrency(filteredTotal)} counted
-              </p>
-            )}
-
-            {/* List */}
-            {filtered.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">
-                No transactions match the selected filters.
-              </div>
-            ) : (
-              <div className="max-h-[60vh] overflow-y-auto rounded-lg border divide-y custom-scrollbar">
-                {filtered.map(transaction => (
-                  <div
-                    key={transaction.id}
-                    className={`flex items-center gap-3 px-3 py-1.5 ${transaction.excluded ? 'opacity-60 bg-muted' : ''}`}
-                  >
-                    <Checkbox
-                      checked={!transaction.excluded}
-                      onCheckedChange={checked => handleIncludeToggle(transaction, checked === true)}
-                      title={transaction.excluded ? 'Click to include in expenses' : 'Click to exclude from expenses'}
-                    />
-                    <div className="w-16 shrink-0 text-xs text-muted-foreground">
-                      {format(parseISO(transaction.date), 'dd MMM')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate" title={transaction.description}>
-                        {transaction.merchant || transaction.description}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        {transaction.merchant ? `${transaction.description} • ` : ''}
-                        {transaction.type}
-                        {transaction.excluded && transaction.excludeReason && (
-                          <span className="text-warning"> • {transaction.excludeReason}</span>
-                        )}
-                      </div>
-                    </div>
-                    <Badge
-                      variant="outline"
-                      className={ACCOUNT_BADGE_STYLES[transaction.account] || ''}
-                      title={transaction.accountName}
+                </div>
+                <div className="flex gap-1">
+                  {(['all', 'included', 'excluded'] as StatusFilter[]).map(status => (
+                    <Button
+                      key={status}
+                      size="sm"
+                      variant={statusFilter === status ? 'default' : 'outline'}
+                      onClick={() => setStatusFilter(status)}
                     >
-                      {transaction.account}
-                    </Badge>
+                      {status === 'all' ? 'All' : status === 'included' ? 'Included' : 'Excluded'}
+                    </Button>
+                  ))}
+                </div>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[180px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All categories</SelectItem>
+                    <SelectItem value="uncategorised">Uncategorised</SelectItem>
+                    {categories.map(category => (
+                      <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                    ))}
+                    <SelectItem value={INCOME_CATEGORY_ID}>Income</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1 min-w-[180px]">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search transactions"
+                    className="pl-9 h-8"
+                  />
+                </div>
+              </div>
+
+              {filtered.length !== transactions.length && (
+                <p className="text-xs text-muted-foreground">
+                  Showing {filtered.length} of {transactions.length} • {formatCurrency(filteredTotal)} counted
+                </p>
+              )}
+
+              {/* List */}
+              {filtered.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground">
+                  No transactions match the selected filters.
+                </div>
+              ) : (
+                <div className="max-h-[60vh] overflow-y-auto rounded-lg border divide-y custom-scrollbar">
+                  {filtered.map(transaction => (
                     <div
-                      className={`w-24 shrink-0 text-right font-semibold tabular-nums ${transaction.direction === 'credit' ? 'text-success' : ''}`}
+                      key={transaction.id}
+                      className={`flex items-center gap-3 px-3 py-1.5 ${transaction.excluded ? 'opacity-60 bg-muted' : ''}`}
                     >
-                      {transaction.direction === 'credit' ? '+' : ''}
-                      {formatCurrency(transaction.amount)}
+                      <Checkbox
+                        checked={!transaction.excluded}
+                        onCheckedChange={checked => handleIncludeToggle(transaction, checked === true)}
+                        title={transaction.excluded ? 'Click to include in expenses' : 'Click to exclude from expenses'}
+                      />
+                      <div className="w-16 shrink-0 text-xs text-muted-foreground">
+                        {format(parseISO(transaction.date), 'dd MMM')}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate" title={transaction.description}>
+                          {transaction.merchant || transaction.description}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {transaction.merchant ? `${transaction.description} • ` : ''}
+                          {transaction.type}
+                          {transaction.excluded && transaction.excludeReason && (
+                            <span className="text-warning"> • {transaction.excludeReason}</span>
+                          )}
+                        </div>
+                      </div>
+                      {transaction.categorySource === 'rule' && (
+                        <span title={`Set by rule: ${rulesById.get(transaction.ruleId || '')?.text ?? 'deleted rule'}`}>
+                          <Wand2 className="h-3.5 w-3.5 shrink-0 text-info" />
+                        </span>
+                      )}
+                      {isManuallyCategorised(transaction) && (
+                        <span title={transaction.amazonItems ? 'Set from your Amazon orders' : 'Set by you'}>
+                          <PenLine className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        </span>
+                      )}
+                      <Badge
+                        variant="outline"
+                        className={ACCOUNT_BADGE_STYLES[transaction.account] || ''}
+                        title={transaction.accountName}
+                      >
+                        {transaction.account}
+                      </Badge>
+                      <div
+                        className={`w-24 shrink-0 text-right font-semibold tabular-nums ${transaction.direction === 'credit' ? 'text-success' : ''}`}
+                      >
+                        {transaction.direction === 'credit' ? '+' : ''}
+                        {formatCurrency(transaction.amount)}
+                      </div>
+                      <Select
+                        value={transaction.categoryId || ''}
+                        onValueChange={value => handleCategoryChange(transaction, value)}
+                        disabled={transaction.excluded}
+                      >
+                        <SelectTrigger className="w-[180px] h-8 shrink-0">
+                          <SelectValue placeholder="Choose category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map(category => (
+                            <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
+                          ))}
+                          <SelectItem value={INCOME_CATEGORY_ID}>Income (not spending)</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select
-                      value={transaction.categoryId || ''}
-                      onValueChange={value => handleCategoryChange(transaction, value)}
-                      disabled={transaction.excluded}
-                    >
-                      <SelectTrigger className="w-[180px] h-8 shrink-0">
-                        <SelectValue placeholder="Choose category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map(category => (
-                          <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
-                        ))}
-                        <SelectItem value={INCOME_CATEGORY_ID}>Income (not spending)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+      {ruleDraft && (
+        <RuleDialog
+          open
+          onOpenChange={isOpen => !isOpen && setRuleDraft(null)}
+          rule={ruleDraft.rule}
+          amount={ruleDraft.amount}
+          offerSkip
+          categories={categories}
+          rules={rules}
+          onSave={onSaveRule}
+        />
+      )}
+    </>
   );
 };

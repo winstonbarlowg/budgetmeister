@@ -32,7 +32,8 @@ export function recalculateImportedExpenses(monthData: MonthData): MonthlyExpens
 
   return categoryIds
     .map(categoryId => {
-      const manualAmount = monthData.expenses.find(e => e.categoryId === categoryId)?.manualAmount || 0;
+      const existing = monthData.expenses.find(e => e.categoryId === categoryId);
+      const manualAmount = existing?.manualAmount || 0;
       const imported = totals.get(categoryId);
       const importedAmount = Math.round(Math.max(0, imported?.amount || 0) * 100) / 100;
       return {
@@ -41,9 +42,10 @@ export function recalculateImportedExpenses(monthData: MonthData): MonthlyExpens
         importedAmount,
         manualAmount,
         linkedTransactionIds: imported?.ids || [],
+        ...(existing?.manualOverride ? { manualOverride: true } : {}),
       };
     })
-    .filter(e => e.importedAmount > 0 || e.manualAmount > 0);
+    .filter(e => e.importedAmount > 0 || e.manualAmount > 0 || e.manualOverride);
 }
 
 export function updateTransaction(
@@ -52,7 +54,7 @@ export function updateTransaction(
   changes: Partial<Pick<MonthTransaction, 'categoryId' | 'excluded' | 'excludeReason'>>
 ): MonthData {
   const transactions = (monthData.transactions || []).map(t =>
-    t.id === transactionId ? { ...t, ...changes, userEdited: true } : t
+    t.id === transactionId ? { ...t, ...changes, userEdited: true, categorySource: 'manual' as const } : t
   );
   const updated = { ...monthData, transactions };
   return { ...updated, expenses: recalculateImportedExpenses(updated) };

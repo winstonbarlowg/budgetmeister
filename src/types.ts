@@ -4,6 +4,10 @@ export interface Category {
   type: 'fixed' | 'variable';
   budgetAmount: number;
   color?: string;
+  // Fixed categories only: fill in budgetAmount for months with nothing imported
+  autoFill?: boolean;
+  activeFrom?: string;           // "YYYY-MM"
+  activeUntil?: string | null;   // "YYYY-MM" or null for ongoing
 }
 
 export interface MonthlyExpense {
@@ -12,6 +16,12 @@ export interface MonthlyExpense {
   importedAmount?: number;            // Amount from CSV imports (minimum floor)
   manualAmount?: number;              // Additional manual adjustments on top of imports
   linkedTransactionIds?: string[];    // Transaction IDs that contribute to importedAmount
+  manualOverride?: boolean;           // Amount typed for this month; replaces the auto-fill default (even £0)
+}
+
+// A month's expense after auto-fill defaults from Settings are applied
+export interface EffectiveExpense extends MonthlyExpense {
+  isDefault: boolean;                 // actualAmount is the category's budgetAmount, filled automatically
 }
 
 export interface IncomeSource {
@@ -68,7 +78,25 @@ export interface MonthTransaction {
   excluded: boolean;             // Not counted towards expenses (e.g. transfers between own accounts)
   excludeReason?: string;
   userEdited?: boolean;          // Changed in the app; re-imports keep the user's choice
+  categorySource?: 'import' | 'rule' | 'manual';  // Who set categoryId/excluded; userEdited means manual
+  ruleId?: string;               // CategoryRule that set the category
+  importCategoryId?: string | null;  // Category from the import, kept so removing a rule can restore it
+  importExcluded?: boolean;
+  importExcludeReason?: string;
+  amazonItems?: string[];        // Amazon order items matched to this charge
   source: 'emma';
+}
+
+// Categorises (or excludes) matching transactions in every month
+export interface CategoryRule {
+  id: string;
+  text: string;                  // Matched case-insensitively against transactionKey()
+  minAmount?: number;
+  maxAmount?: number;
+  direction?: 'debit' | 'credit';
+  categoryId: string | null;     // Ignored when exclude is true
+  exclude?: boolean;
+  createdAt: string;
 }
 
 export interface MonthData {
@@ -84,6 +112,7 @@ export interface BudgetConfig {
   categories: Category[];
   incomeSources: IncomeSource[];
   transactionConfig?: TransactionConfig;
+  categoryRules?: CategoryRule[];
   lastModified: string;
 }
 
