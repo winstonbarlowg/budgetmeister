@@ -14,6 +14,7 @@ interface FileSystemDirectoryHandle extends FileSystemHandle {
   readonly kind: 'directory';
   getFileHandle(name: string, options?: { create?: boolean }): Promise<FileSystemFileHandle>;
   getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<FileSystemDirectoryHandle>;
+  values(): AsyncIterableIterator<FileSystemFileHandle | FileSystemDirectoryHandle>;
 }
 
 interface FileSystemWritableFileStream extends WritableStream {

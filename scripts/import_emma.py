@@ -138,9 +138,11 @@ def recalculate_expenses(month_data, transactions):
     by_category = {e['categoryId']: e for e in month_data.get('expenses', [])}
     expenses = []
     for category_id in list(by_category) + [c for c in totals if c not in by_category]:
-        manual = (by_category.get(category_id) or {}).get('manualAmount', 0) or 0
+        existing = by_category.get(category_id) or {}
+        manual = existing.get('manualAmount', 0) or 0
+        override = bool(existing.get('manualOverride'))
         imported = round(max(0.0, totals.get(category_id, 0.0)), 2)
-        if imported == 0 and manual == 0:
+        if imported == 0 and manual == 0 and not override:
             continue
         expenses.append({
             'categoryId': category_id,
@@ -148,6 +150,7 @@ def recalculate_expenses(month_data, transactions):
             'importedAmount': imported,
             'manualAmount': manual,
             'linkedTransactionIds': ids.get(category_id, []),
+            **({'manualOverride': True} if override else {}),
         })
     return expenses
 
@@ -235,7 +238,7 @@ def main():
         for t in new_txns:
             old = previous.get(t['id'])
             if old and old.get('userEdited'):
-                for key in ('categoryId', 'excluded', 'excludeReason', 'userEdited'):
+                for key in ('categoryId', 'excluded', 'excludeReason', 'userEdited', 'categorySource', 'amazonItems'):
                     if key in old:
                         t[key] = old[key]
                     else:
