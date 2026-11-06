@@ -55,6 +55,13 @@ export class FileSystemManager {
         config.incomeSources = [];
       }
 
+      // Backwards compatibility: auto-fill settings on fixed categories become their first expected amount
+      config.categories = config.categories.map(({ autoFill, activeFrom, activeUntil, ...category }: any) =>
+        category.type === 'fixed' && autoFill && !category.expectedAmounts
+          ? { ...category, expectedAmounts: [{ amount: category.budgetAmount, from: activeFrom || undefined, until: activeUntil || undefined }] }
+          : category
+      );
+
       // Backwards compatibility: add transactionConfig if missing
       if (!config.transactionConfig) {
         config.transactionConfig = {

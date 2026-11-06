@@ -1,4 +1,4 @@
-import { BudgetConfig, Category, EffectiveExpense, MonthData, MonthSummary, CategoryWithActual, IncomeSource, MonthlyIncome, IncomeWithSource } from '../types';
+import { BudgetConfig, Category, EffectiveExpense, ExpectedAmount, MonthData, MonthSummary, CategoryWithActual, IncomeSource, MonthlyIncome, IncomeWithSource } from '../types';
 
 export function calculateMonthSummary(
   config: BudgetConfig,
@@ -8,13 +8,14 @@ export function calculateMonthSummary(
   const categories: CategoryWithActual[] = config.categories.map((category) => {
     const expense = expenses.find((e) => e.categoryId === category.id);
     const actualAmount = expense?.actualAmount || 0;
-    const variance = actualAmount - category.budgetAmount;
-    const percentUsed = category.budgetAmount > 0
-      ? (actualAmount / category.budgetAmount) * 100
-      : 0;
+    // Fixed costs are known in advance, so only variable categories have a budget
+    const budgetAmount = category.type === 'variable' ? category.budgetAmount : 0;
+    const variance = category.type === 'variable' ? actualAmount - budgetAmount : 0;
+    const percentUsed = budgetAmount > 0 ? (actualAmount / budgetAmount) * 100 : 0;
 
     return {
       ...category,
+      budgetAmount,
       actualAmount,
       variance,
       percentUsed,
@@ -24,9 +25,7 @@ export function calculateMonthSummary(
   const fixedCategories = categories.filter((c) => c.type === 'fixed');
   const variableCategories = categories.filter((c) => c.type === 'variable');
 
-  const totalBudget = categories.reduce((sum, c) => sum + c.budgetAmount, 0);
   const totalActual = categories.reduce((sum, c) => sum + c.actualAmount, 0);
-  const fixedBudget = fixedCategories.reduce((sum, c) => sum + c.budgetAmount, 0);
   const fixedActual = fixedCategories.reduce((sum, c) => sum + c.actualAmount, 0);
   const variableBudget = variableCategories.reduce((sum, c) => sum + c.budgetAmount, 0);
   const variableActual = variableCategories.reduce((sum, c) => sum + c.actualAmount, 0);
@@ -65,13 +64,11 @@ export function calculateMonthSummary(
   return {
     year: monthData.year,
     month: monthData.month,
-    totalBudget,
     totalActual,
-    totalVariance: totalActual - totalBudget,
-    fixedBudget,
     fixedActual,
     variableBudget,
     variableActual,
+    variableVariance: variableActual - variableBudget,
     categories,
     totalIncomeGross,
     totalIncomeNet,
@@ -145,22 +142,32 @@ export function getEffectiveIncome(
 const toMonthKey = (year: number, month: number) => `${year}-${month.toString().padStart(2, '0')}`;
 
 /**
- * Whether a fixed category fills in its budget amount for this month: auto-fill is on,
- * the month is inside its From–Until range, and the month has started.
+ * What a fixed category is expected to cost in a month, from the period in Settings
+ * covering it (the latest-starting one if periods overlap). Null for months not covered
+ * and for months that haven't started.
  */
-export function isAutoFillActive(category: Category, year: number, month: number, today = new Date()): boolean {
-  if (category.type !== 'fixed' || !category.autoFill) return false;
+export function getExpectedAmount(category: Category, year: number, month: number, today = new Date()): number | null {
+  if (category.type !== 'fixed' || !category.expectedAmounts?.length) return null;
   const target = toMonthKey(year, month);
-  return (
-    target <= toMonthKey(today.getFullYear(), today.getMonth() + 1) &&
-    (!category.activeFrom || target >= category.activeFrom) &&
-    (!category.activeUntil || target <= category.activeUntil)
-  );
+  if (target > toMonthKey(today.getFullYear(), today.getMonth() + 1)) return null;
+  const period = category.expectedAmounts
+    .filter(p => (!p.from || target >= p.from) && (!p.until || target <= p.until))
+    .sort((a, b) => (b.from || '').localeCompare(a.from || ''))[0];
+  return period ? period.amount : null;
+}
+
+/** The expected amount that applies now, or most recently, for showing in Settings */
+export function getCurrentExpectedAmount(category: Category, today = new Date()): ExpectedAmount | null {
+  const current = toMonthKey(today.getFullYear(), today.getMonth() + 1);
+  const started = (category.expectedAmounts || []).filter(p => !p.from || p.from <= current);
+  return started.find(p => !p.until || p.until >= current)
+    || started.sort((a, b) => (b.until || '').localeCompare(a.until || ''))[0]
+    || null;
 }
 
 /**
- * Expenses for a month: amounts saved for that month win, and auto-fill categories
- * with nothing imported or typed fall back to their budget amount from Settings.
+ * Expenses for a month: amounts saved for that month win, and fixed categories
+ * with nothing imported or typed fall back to their expected amount from Settings.
  */
 export function getEffectiveExpenses(
   categories: Category[],
@@ -170,23 +177,23 @@ export function getEffectiveExpenses(
   const saved = new Map(monthData.expenses.map(e => [e.categoryId, normalizeExpense(e)]));
   const effective: EffectiveExpense[] = monthData.expenses.map(e => ({ ...saved.get(e.categoryId), isDefault: false }));
 
-  categories
-    .filter(category => isAutoFillActive(category, monthData.year, monthData.month, today))
-    .forEach(category => {
-      const expense = saved.get(category.id);
-      if (expense && (expense.manualOverride || expense.importedAmount > 0 || expense.manualAmount > 0)) return;
-      const filled: EffectiveExpense = {
-        categoryId: category.id,
-        actualAmount: category.budgetAmount,
-        importedAmount: 0,
-        manualAmount: 0,
-        linkedTransactionIds: [],
-        isDefault: true,
-      };
-      const index = effective.findIndex(e => e.categoryId === category.id);
-      if (index >= 0) effective[index] = filled;
-      else effective.push(filled);
-    });
+  categories.forEach(category => {
+    const expected = getExpectedAmount(category, monthData.year, monthData.month, today);
+    if (expected === null) return;
+    const expense = saved.get(category.id);
+    if (expense && (expense.manualOverride || expense.importedAmount > 0 || expense.manualAmount > 0)) return;
+    const filled: EffectiveExpense = {
+      categoryId: category.id,
+      actualAmount: expected,
+      importedAmount: 0,
+      manualAmount: 0,
+      linkedTransactionIds: [],
+      isDefault: true,
+    };
+    const index = effective.findIndex(e => e.categoryId === category.id);
+    if (index >= 0) effective[index] = filled;
+    else effective.push(filled);
+  });
 
   return effective;
 }

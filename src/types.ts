@@ -1,13 +1,17 @@
+// What a fixed cost is expected to be over a period; used for months with nothing imported
+export interface ExpectedAmount {
+  amount: number;
+  from?: string;                 // "YYYY-MM"; omitted means every month before until
+  until?: string | null;         // "YYYY-MM" or null/omitted for ongoing
+}
+
 export interface Category {
   id: string;
   name: string;
   type: 'fixed' | 'variable';
-  budgetAmount: number;
+  budgetAmount: number;          // Variable categories only; fixed costs have no budget
   color?: string;
-  // Fixed categories only: fill in budgetAmount for months with nothing imported
-  autoFill?: boolean;
-  activeFrom?: string;           // "YYYY-MM"
-  activeUntil?: string | null;   // "YYYY-MM" or null for ongoing
+  expectedAmounts?: ExpectedAmount[];  // Fixed categories only
 }
 
 export interface MonthlyExpense {
@@ -16,12 +20,12 @@ export interface MonthlyExpense {
   importedAmount?: number;            // Amount from CSV imports (minimum floor)
   manualAmount?: number;              // Additional manual adjustments on top of imports
   linkedTransactionIds?: string[];    // Transaction IDs that contribute to importedAmount
-  manualOverride?: boolean;           // Amount typed for this month; replaces the auto-fill default (even £0)
+  manualOverride?: boolean;           // Amount typed for this month; replaces the expected amount (even £0)
 }
 
-// A month's expense after auto-fill defaults from Settings are applied
+// A month's expense after expected amounts from Settings are applied
 export interface EffectiveExpense extends MonthlyExpense {
-  isDefault: boolean;                 // actualAmount is the category's budgetAmount, filled automatically
+  isDefault: boolean;                 // actualAmount is the category's expected amount for the month
 }
 
 export interface IncomeSource {
@@ -129,13 +133,11 @@ export interface CategoryWithActual extends Category {
 export interface MonthSummary {
   year: number;
   month: number;
-  totalBudget: number;
-  totalActual: number;
-  totalVariance: number;
-  fixedBudget: number;
-  fixedActual: number;
+  totalActual: number;          // All spending, fixed and variable
+  fixedActual: number;          // Fixed costs; these have no budget
   variableBudget: number;
   variableActual: number;
+  variableVariance: number;     // variableActual - variableBudget
   categories: CategoryWithActual[];
   totalIncomeGross: number;
   totalIncomeNet: number;

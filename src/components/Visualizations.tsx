@@ -77,11 +77,15 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
     Variable: { label: 'Variable', color: 'hsl(var(--chart-2))' },
   } satisfies ChartConfig;
 
-  // 1. Monthly Budget vs Actual Bar Chart
+  // 1. Variable spending against its budget (fixed costs have no budget)
   const budgetVsActualData = [
-    { name: 'Budget', Fixed: selectedMonth.fixedBudget, Variable: selectedMonth.variableBudget },
-    { name: 'Actual', Fixed: selectedMonth.fixedActual, Variable: selectedMonth.variableActual },
+    { name: 'Variable spending', budget: selectedMonth.variableBudget, actual: selectedMonth.variableActual },
   ];
+
+  const budgetVsActualConfig = {
+    budget: { label: 'Budget', color: 'hsl(var(--muted-foreground))' },
+    actual: { label: 'Spent', color: 'hsl(var(--info))' },
+  } satisfies ChartConfig;
 
   // 2. Spending by Category (Donut Chart)
   const categorySpendingData = selectedMonth.categories
@@ -105,13 +109,15 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   // 4. Monthly Trend Line (months with no spending yet leave a gap rather than dropping to £0)
   const monthlyTrendData = yearData.map((month) => ({
     month: getMonthShortName(month.month),
-    budget: month.totalBudget,
-    actual: month.totalActual > 0 ? month.totalActual : null,
+    budget: month.variableBudget,
+    actual: month.totalActual > 0 ? month.variableActual : null,
+    total: month.totalActual > 0 ? month.totalActual : null,
   }));
 
   const trendConfig = {
-    budget: { label: 'Budget', color: 'hsl(var(--muted-foreground))' },
-    actual: { label: 'Actual', color: 'hsl(var(--info))' },
+    budget: { label: 'Variable budget', color: 'hsl(var(--muted-foreground))' },
+    actual: { label: 'Variable spending', color: 'hsl(var(--info))' },
+    total: { label: 'All spending', color: 'hsl(var(--chart-1))' },
   } satisfies ChartConfig;
 
   // 5. Variance per variable category (fixed expenses are expected to match their budget)
@@ -134,16 +140,16 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
   const formatAxisCurrency = (value: number) =>
     new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', notation: 'compact', maximumFractionDigits: 1 }).format(value);
 
-  // 6. YTD Progress
-  const ytdBudget = yearData.reduce((sum, m) => sum + m.totalBudget, 0);
-  const ytdActual = yearData.reduce((sum, m) => sum + m.totalActual, 0);
+  // 6. YTD Progress (variable spending against its budget)
+  const ytdBudget = yearData.reduce((sum, m) => sum + m.variableBudget, 0);
+  const ytdActual = yearData.reduce((sum, m) => sum + m.variableActual, 0);
   const ytdPercent = ytdBudget > 0 ? (ytdActual / ytdBudget) * 100 : 0;
 
   const currentMonthIndex = new Date().getMonth() + 1;
   const expectedPercent = (currentMonthIndex / 12) * 100;
 
-  // 7. Category Variance Heatmap (simplified grid view)
-  const heatmapData = currentMonth.categories.map((category) => {
+  // 7. Category Variance Heatmap (variable categories; fixed costs have no budget to compare with)
+  const heatmapData = currentMonth.categories.filter((category) => category.type === 'variable').map((category) => {
     const monthlyData = yearData.map((month) => {
       if (month.totalActual === 0) return null; // no spending recorded that month
       const cat = month.categories.find((c) => c.id === category.id);
@@ -220,18 +226,18 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
         <Card>
           <CardHeader>
             <CardTitle>Budget vs Actual</CardTitle>
-            <CardDescription>{getMonthName(selectedMonth.month)} {selectedMonth.year}</CardDescription>
+            <CardDescription>Variable spending, {getMonthName(selectedMonth.month)} {selectedMonth.year}</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={fixedVariableConfig} className="min-h-[300px] w-full">
+            <ChartContainer config={budgetVsActualConfig} className="min-h-[300px] w-full">
               <BarChart accessibilityLayer data={budgetVsActualData}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={10} />
                 <YAxis tickLine={false} axisLine={false} tickFormatter={formatAxisCurrency} width={60} />
                 <ChartTooltip content={<ChartTooltipContent valueFormatter={formatCurrency} />} />
                 <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="Fixed" fill="var(--color-Fixed)" radius={4} />
-                <Bar dataKey="Variable" fill="var(--color-Variable)" radius={4} />
+                <Bar dataKey="budget" fill="var(--color-budget)" radius={4} />
+                <Bar dataKey="actual" fill="var(--color-actual)" radius={4} />
               </BarChart>
             </ChartContainer>
           </CardContent>
@@ -329,7 +335,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
       <Card>
         <CardHeader>
           <CardTitle>Year-to-Date Progress</CardTitle>
-          <CardDescription>Budget performance across all months</CardDescription>
+          <CardDescription>Variable spending against its budget across the year</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-6 p-4">
@@ -369,7 +375,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
       <Card>
         <CardHeader>
           <CardTitle>Monthly Spending Trend</CardTitle>
-          <CardDescription>Budget vs actual spending across all months</CardDescription>
+          <CardDescription>Variable spending against its budget, with all spending for context</CardDescription>
         </CardHeader>
         <CardContent>
           <ChartContainer config={trendConfig} className="min-h-[300px] w-full">
@@ -381,6 +387,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
               <ChartLegend content={<ChartLegendContent />} />
               <Line type="monotone" dataKey="budget" stroke="var(--color-budget)" strokeWidth={2} strokeDasharray="4 4" dot={false} />
               <Line type="monotone" dataKey="actual" stroke="var(--color-actual)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-actual)' }} />
+              <Line type="monotone" dataKey="total" stroke="var(--color-total)" strokeWidth={2} dot={{ r: 3, fill: 'var(--color-total)' }} />
             </LineChart>
           </ChartContainer>
         </CardContent>
@@ -390,7 +397,7 @@ export const Visualizations: React.FC<VisualizationsProps> = ({ currentMonth, ye
       <Card>
         <CardHeader>
           <CardTitle>Category Performance Heatmap</CardTitle>
-          <CardDescription>Yearly variance percentages by category and month</CardDescription>
+          <CardDescription>Variable categories against their budget, by month</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>

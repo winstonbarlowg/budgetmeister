@@ -1,8 +1,8 @@
-import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, CalendarCheck, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, CalendarCheck, RotateCcw, Lock, ShoppingCart } from 'lucide-react';
 import { MonthData, Category, MonthSummary, BudgetConfig, IncomeSource, MonthlyExpense } from '../types';
 import {
   calculateMonthSummary, formatCurrency, normalizeExpense, updateExpenseAmount,
-  getEffectiveExpenses, isAutoFillActive,
+  getEffectiveExpenses, getExpectedAmount,
 } from '../utils/calculations';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -38,7 +38,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   onSave,
   onMonthChange,
 }) => {
-  // Saved amounts plus auto-fill defaults from Settings, derived on every render
+  // Saved amounts plus expected fixed costs from Settings, derived on every render
   const effectiveById = new Map(getEffectiveExpenses(categories, monthData).map(e => [e.categoryId, e]));
   const savedById = new Map(monthData.expenses.map(e => [e.categoryId, normalizeExpense(e) as MonthlyExpense]));
 
@@ -51,13 +51,13 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   const handleExpenseChange = (category: Category, amount: number) => {
     const current = savedById.get(category.id) || emptyExpense(category.id);
     const updated = updateExpenseAmount(current, amount);
-    const autoFill = isAutoFillActive(category, monthData.year, monthData.month);
-    // Typing the default amount back in means there is nothing to override any more
-    if (autoFill && !updated.importedAmount && Math.abs(updated.actualAmount - category.budgetAmount) < 0.005) {
+    const expected = getExpectedAmount(category, monthData.year, monthData.month);
+    // Typing the expected amount back in means there is nothing to override any more
+    if (expected !== null && !updated.importedAmount && Math.abs(updated.actualAmount - expected) < 0.005) {
       handleUseDefault(category.id);
       return;
     }
-    saveExpense({ ...updated, ...(autoFill ? { manualOverride: true } : {}) }, category.id);
+    saveExpense({ ...updated, ...(expected !== null ? { manualOverride: true } : {}) }, category.id);
   };
 
   const handleUseDefault = (categoryId: string) => {
@@ -104,7 +104,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   const fixedCategories = summary.categories.filter((c) => c.type === 'fixed');
   const variableCategories = summary.categories.filter((c) => c.type === 'variable');
 
-  const isUnderBudget = summary.totalVariance <= 0;
+  const isUnderBudget = summary.variableVariance <= 0;
 
   return (
     <div className="space-y-4">
@@ -135,33 +135,35 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/40">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">Total Budget</CardDescription>
-            <CardTitle className="text-2xl text-primary">{formatCurrency(summary.totalBudget)}</CardTitle>
+            <CardDescription className="flex items-center gap-1.5 text-xs font-medium">
+              <Lock className="h-3 w-3" /> Fixed Costs
+            </CardDescription>
+            <CardTitle className="text-2xl text-primary">{formatCurrency(summary.fixedActual)}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xs text-muted-foreground">Monthly allocation</p>
+            <p className="text-xs text-muted-foreground">Known monthly commitments</p>
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-info/20 to-info/5 border-info/40">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">Total Spent</CardDescription>
-            <CardTitle className="text-2xl text-info">{formatCurrency(summary.totalActual)}</CardTitle>
+            <CardDescription className="flex items-center gap-1.5 text-xs font-medium">
+              <ShoppingCart className="h-3 w-3" /> Variable Spending
+            </CardDescription>
+            <CardTitle className="text-2xl text-info">{formatCurrency(summary.variableActual)}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-muted-foreground">
-                {summary.totalActual > 0
-                  ? `${((summary.totalActual / summary.totalBudget) * 100).toFixed(1)}% of budget`
-                  : 'No expenses yet'}
-              </span>
-            </div>
+            <p className="text-xs text-muted-foreground">
+              {summary.variableBudget > 0
+                ? `${((summary.variableActual / summary.variableBudget) * 100).toFixed(1)}% of ${formatCurrency(summary.variableBudget)} budget`
+                : 'No variable budget set'}
+            </p>
           </CardContent>
         </Card>
 
         <Card className={isUnderBudget ? "bg-gradient-to-br from-success/20 to-success/5 border-success/40" : "bg-gradient-to-br from-destructive/20 to-destructive/5 border-destructive/40"}>
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-medium">Variance</CardDescription>
+            <CardDescription className="text-xs font-medium">Variable vs Budget</CardDescription>
             <CardTitle className="text-2xl flex items-center gap-2">
               {isUnderBudget ? (
                 <TrendingDown className="h-5 w-5 text-success" />
@@ -169,8 +171,8 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                 <TrendingUp className="h-5 w-5 text-destructive" />
               )}
               <span className={isUnderBudget ? 'text-success' : 'text-destructive'}>
-                {summary.totalVariance > 0 ? '+' : ''}
-                {formatCurrency(summary.totalVariance)}
+                {summary.variableVariance > 0 ? '+' : ''}
+                {formatCurrency(summary.variableVariance)}
               </span>
             </CardTitle>
           </CardHeader>
@@ -193,7 +195,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
           </CardHeader>
           <CardContent>
             <p className="text-xs text-muted-foreground">
-              Income - Expenses
+              Income − all spending ({formatCurrency(summary.totalActual)})
             </p>
             {summary.totalMoneyMovements > 0 && (
               <div className="mt-2 pt-2 border-t border-highlight/30">
@@ -237,7 +239,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
           <CardHeader>
             <CardTitle>Fixed Expenses</CardTitle>
             <CardDescription>
-              {formatCurrency(summary.fixedActual)} / {formatCurrency(summary.fixedBudget)}
+              From transactions, or the expected amount in Settings when nothing is imported
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -259,20 +261,22 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
                           {category.name}
                         </Label>
                         <p className="text-xs text-muted-foreground">
-                          Budget: {formatCurrency(category.budgetAmount)}
                           {hasImports && (
-                            <span className="ml-1 text-info font-medium">
-                              • {formatCurrency(detail?.importedAmount || 0)} imported
+                            <span className="text-info font-medium">
+                              {formatCurrency(detail?.importedAmount || 0)} imported
                             </span>
                           )}
-                          {detail?.isDefault && <span className="ml-1">• Default from Settings</span>}
-                          {detail?.manualOverride && isAutoFillActive(category, monthData.year, monthData.month) && (
+                          {detail?.isDefault && <span>Expected amount from Settings</span>}
+                          {!hasImports && !detail?.isDefault && (detail?.actualAmount || detail?.manualOverride) ? <span>Entered for this month</span> : null}
+                          {!hasImports && !detail?.isDefault && !detail?.actualAmount && !detail?.manualOverride && <span>Nothing this month</span>}
+                          {!hasImports && (detail?.manualOverride || (detail?.manualAmount || 0) > 0) &&
+                            getExpectedAmount(category, monthData.year, monthData.month) !== null && (
                             <button
                               type="button"
                               onClick={() => handleUseDefault(category.id)}
                               className="ml-1 inline-flex items-center gap-0.5 text-info hover:underline"
                             >
-                              • <RotateCcw className="h-3 w-3" /> Use default
+                              • <RotateCcw className="h-3 w-3" /> Use expected
                             </button>
                           )}
                         </p>
@@ -292,9 +296,7 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
             <div className="pt-3 border-t">
               <div className="flex items-center justify-between font-semibold">
                 <span>Fixed Total</span>
-                <span className={summary.fixedActual > summary.fixedBudget ? 'text-destructive' : 'text-success'}>
-                  {formatCurrency(summary.fixedActual)}
-                </span>
+                <span>{formatCurrency(summary.fixedActual)}</span>
               </div>
             </div>
           </CardContent>
