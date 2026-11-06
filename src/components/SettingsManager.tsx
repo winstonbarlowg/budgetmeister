@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Category, CategoryRule, IncomeSource } from '../types';
+import { Category, CategoryRule, IncomeSource, MonthData } from '../types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { CategoryManager } from './CategoryManager';
@@ -9,6 +9,7 @@ import { RuleManager } from './RuleManager';
 interface SettingsManagerProps {
   categories: Category[];
   incomeSources: IncomeSource[];
+  allMonths: MonthData[];
   rules: CategoryRule[];
   onSaveRules: (rules: CategoryRule[]) => Promise<void>;
   onSaveRule: (rule: CategoryRule) => Promise<void>;
@@ -19,6 +20,7 @@ interface SettingsManagerProps {
 export const SettingsManager: React.FC<SettingsManagerProps> = ({
   categories,
   incomeSources,
+  allMonths,
   rules,
   onSaveRules,
   onSaveRule,
@@ -48,7 +50,7 @@ export const SettingsManager: React.FC<SettingsManagerProps> = ({
       </TabsContent>
 
       <TabsContent value="rules" className="space-y-4">
-        <RuleManager categories={categories} rules={rules} onSaveRules={onSaveRules} onSaveRule={onSaveRule} />
+        <RuleManager categories={categories} months={allMonths} rules={rules} onSaveRules={onSaveRules} onSaveRule={onSaveRule} />
       </TabsContent>
 
       <TabsContent value="income" className="space-y-4">

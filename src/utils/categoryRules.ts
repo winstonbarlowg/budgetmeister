@@ -7,18 +7,25 @@ const isReferenceToken = (token: string) => {
   return digits > 0 && digits / token.length >= 0.4;
 };
 
+// Keys are needed for every transaction against every rule, so build each one once
+const keyCache = new WeakMap<object, { description: string; key: string }>();
+
 /**
  * Merchant identity used for rules: the description in upper case without
  * reference numbers, e.g. "AMZNMKTPLACE*B20NI6MK4 AMAZON.CO.UK" -> "AMZNMKTPLACE AMAZON.CO.UK"
  * and "Douglas Wills & SoInvoice 8622" -> "DOUGLAS WILLS & SOINVOICE".
  */
 export function transactionKey(transaction: Pick<MonthTransaction, 'description'>): string {
-  return transaction.description
+  const cached = keyCache.get(transaction);
+  if (cached !== undefined && cached.description === transaction.description) return cached.key;
+  const key = transaction.description
     .toUpperCase()
     .replace(/\*\S*/g, ' ')
     .split(/\s+/)
     .filter(token => token && !isReferenceToken(token))
     .join(' ');
+  keyCache.set(transaction, { description: transaction.description, key });
+  return key;
 }
 
 export function normaliseRuleText(text: string): string {
@@ -34,8 +41,14 @@ export function hasAmountRange(rule: CategoryRule): boolean {
   return rule.minAmount !== undefined || rule.maxAmount !== undefined;
 }
 
-export function ruleMatches(rule: CategoryRule, transaction: MonthTransaction): boolean {
-  const text = normaliseRuleText(rule.text);
+// A rule with its text normalised once; lists of these are kept most specific first
+interface CompiledRule {
+  rule: CategoryRule;
+  text: string;
+  ranged: boolean;
+}
+
+function matchesCompiled({ rule, text }: CompiledRule, transaction: MonthTransaction): boolean {
   if (!text || !transactionKey(transaction).includes(text)) return false;
   if (rule.direction && rule.direction !== transaction.direction) return false;
   if (rule.minAmount !== undefined && transaction.amount < rule.minAmount - 0.005) return false;
@@ -44,16 +57,25 @@ export function ruleMatches(rule: CategoryRule, transaction: MonthTransaction): 
 }
 
 // Rules with an amount range beat merchant-only rules, then longer text, then newer rules
-function compareSpecificity(a: CategoryRule, b: CategoryRule): number {
-  return (
-    Number(hasAmountRange(b)) - Number(hasAmountRange(a)) ||
-    normaliseRuleText(b.text).length - normaliseRuleText(a.text).length ||
-    b.createdAt.localeCompare(a.createdAt)
-  );
+export function compileRules(rules: CategoryRule[]): CompiledRule[] {
+  return rules
+    .map(rule => ({ rule, text: normaliseRuleText(rule.text), ranged: hasAmountRange(rule) }))
+    .sort((a, b) =>
+      Number(b.ranged) - Number(a.ranged) ||
+      b.text.length - a.text.length ||
+      b.rule.createdAt.localeCompare(a.rule.createdAt)
+    );
+}
+
+const findCompiled = (transaction: MonthTransaction, compiled: CompiledRule[]) =>
+  compiled.find(c => matchesCompiled(c, transaction))?.rule;
+
+export function ruleMatches(rule: CategoryRule, transaction: MonthTransaction): boolean {
+  return matchesCompiled({ rule, text: normaliseRuleText(rule.text), ranged: hasAmountRange(rule) }, transaction);
 }
 
 export function findRule(transaction: MonthTransaction, rules: CategoryRule[]): CategoryRule | undefined {
-  return rules.filter(rule => ruleMatches(rule, transaction)).sort(compareSpecificity)[0];
+  return findCompiled(transaction, compileRules(rules));
 }
 
 function withRule(transaction: MonthTransaction, rule: CategoryRule): MonthTransaction {
@@ -105,9 +127,10 @@ export function applyRulesToMonth(
   rules: CategoryRule[]
 ): { monthData: MonthData; changedCount: number } {
   let changedCount = 0;
+  const compiled = compileRules(rules);
   const transactions = (monthData.transactions || []).map(t => {
     if (isManuallyCategorised(t)) return t;
-    const rule = findRule(t, rules);
+    const rule = findCompiled(t, compiled);
     const next = rule ? withRule(t, rule) : t.categorySource === 'rule' ? withoutRule(t) : t;
     if (next === t || sameCategorisation(next, t)) return t;
     changedCount++;
@@ -116,6 +139,43 @@ export function applyRulesToMonth(
   if (changedCount === 0) return { monthData, changedCount };
   const updated = { ...monthData, transactions };
   return { monthData: { ...updated, expenses: recalculateImportedExpenses(updated) }, changedCount };
+}
+
+interface IndexedTransaction {
+  transaction: MonthTransaction;
+  monthKey: string;
+}
+
+// Transactions rules can change, grouped by key, so a rule only looks at keys containing its text
+const indexCache = new WeakMap<MonthData[], Map<string, IndexedTransaction[]>>();
+
+function indexByKey(months: MonthData[]): Map<string, IndexedTransaction[]> {
+  const cached = indexCache.get(months);
+  if (cached) return cached;
+  const index = new Map<string, IndexedTransaction[]>();
+  months.forEach(month => {
+    const monthKey = `${month.year}-${month.month}`;
+    (month.transactions || []).forEach(transaction => {
+      if (isManuallyCategorised(transaction)) return;
+      const key = transactionKey(transaction);
+      const entries = index.get(key);
+      if (entries) entries.push({ transaction, monthKey });
+      else index.set(key, [{ transaction, monthKey }]);
+    });
+  });
+  indexCache.set(months, index);
+  return index;
+}
+
+/** How many transactions each rule currently categorises, in one pass */
+export function countRuleMatches(rules: CategoryRule[], months: MonthData[]): Map<string, number> {
+  const compiled = compileRules(rules);
+  const counts = new Map(rules.map(rule => [rule.id, 0]));
+  indexByKey(months).forEach(entries => entries.forEach(({ transaction }) => {
+    const rule = findCompiled(transaction, compiled);
+    if (rule) counts.set(rule.id, (counts.get(rule.id) || 0) + 1);
+  }));
+  return counts;
 }
 
 /**
@@ -127,15 +187,18 @@ export function previewRule(
   otherRules: CategoryRule[],
   months: MonthData[]
 ): { matches: number; months: number; changes: number } {
-  const rules = [...otherRules.filter(r => r.id !== rule.id), rule];
+  const text = normaliseRuleText(rule.text);
+  const compiled = compileRules([...otherRules.filter(r => r.id !== rule.id), rule]);
   let matches = 0;
   let changes = 0;
   const monthKeys = new Set<string>();
-  months.forEach(month => {
-    (month.transactions || []).forEach(t => {
-      if (isManuallyCategorised(t) || findRule(t, rules)?.id !== rule.id) return;
+  if (!text) return { matches, months: 0, changes };
+  indexByKey(months).forEach((entries, key) => {
+    if (!key.includes(text)) return;
+    entries.forEach(({ transaction: t, monthKey }) => {
+      if (findCompiled(t, compiled)?.id !== rule.id) return;
       matches++;
-      monthKeys.add(`${month.year}-${month.month}`);
+      monthKeys.add(monthKey);
       // Only a different category or exclusion counts, not a different rule setting the same one
       const next = withRule(t, rule);
       if (next.categoryId !== t.categoryId || next.excluded !== t.excluded) changes++;

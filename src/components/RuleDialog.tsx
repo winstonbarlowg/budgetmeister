@@ -3,7 +3,6 @@ import { Category, CategoryRule, MonthData } from '../types';
 import { INCOME_CATEGORY_ID } from '../utils/monthTransactions';
 import { hasAmountRange, previewRule } from '../utils/categoryRules';
 import { formatCurrency } from '../utils/calculations';
-import { fileSystemManager } from '../utils/fileSystem';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from './ui/dialog';
@@ -29,13 +28,13 @@ interface RuleDialogProps {
   offerSkip?: boolean;
   categories: Category[];
   rules: CategoryRule[];
+  months: MonthData[];
   onSave: (rule: CategoryRule) => Promise<void>;
 }
 
 export const RuleDialog: React.FC<RuleDialogProps> = ({
-  open, onOpenChange, rule, amount, offerSkip, categories, rules, onSave,
+  open, onOpenChange, rule, amount, offerSkip, categories, rules, months, onSave,
 }) => {
-  const [months, setMonths] = useState<MonthData[]>([]);
   const [scope, setScope] = useState<Scope>('merchant');
   const [text, setText] = useState('');
   const [minAmount, setMinAmount] = useState(0);
@@ -50,7 +49,6 @@ export const RuleDialog: React.FC<RuleDialogProps> = ({
     setMinAmount(rule.minAmount ?? amount ?? 0);
     setMaxAmount(rule.maxAmount ?? amount ?? 0);
     setTarget(rule.exclude ? EXCLUDE_VALUE : rule.categoryId || '');
-    fileSystemManager.loadAllMonths().then(setMonths).catch(() => setMonths([]));
   }, [open, rule, amount, offerSkip]);
 
   const draft = useMemo<CategoryRule>(() => ({
@@ -138,9 +136,7 @@ export const RuleDialog: React.FC<RuleDialogProps> = ({
 
           {scope !== 'none' && (
             <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-              {months.length === 0
-                ? 'Counting matches…'
-                : `Matches ${preview.matches} transaction${preview.matches === 1 ? '' : 's'} in ${preview.months} month${preview.months === 1 ? '' : 's'}; ${preview.changes} would change.`}
+              {`Matches ${preview.matches} transaction${preview.matches === 1 ? '' : 's'} in ${preview.months} month${preview.months === 1 ? '' : 's'}; ${preview.changes} would change.`}
               {scope === 'amount' && ` Range ${formatCurrency(draft.minAmount || 0)}–${formatCurrency(draft.maxAmount || 0)}.`}
             </p>
           )}

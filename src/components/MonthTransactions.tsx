@@ -11,7 +11,6 @@ import {
   updateTransaction,
 } from '../utils/monthTransactions';
 import { createRuleId, isManuallyCategorised, previewRule, transactionKey } from '../utils/categoryRules';
-import { fileSystemManager } from '../utils/fileSystem';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -24,6 +23,7 @@ import { RuleDialog } from './RuleDialog';
 interface MonthTransactionsProps {
   categories: Category[];
   monthData: MonthData;
+  allMonths: MonthData[];
   rules: CategoryRule[];
   onSave: (data: MonthData) => Promise<void>;
   onSaveRule: (rule: CategoryRule) => Promise<void>;
@@ -39,6 +39,7 @@ type StatusFilter = 'all' | 'included' | 'excluded';
 export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
   categories,
   monthData,
+  allMonths,
   rules,
   onSave,
   onSaveRule,
@@ -72,8 +73,13 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
 
   const rulesById = new Map(rules.map(rule => [rule.id, rule]));
 
-  // Offer a rule when other months have transactions from the same merchant that it would cover
-  const offerRule = async (transaction: MonthTransaction, target: Pick<CategoryRule, 'categoryId' | 'exclude'>) => {
+  // Offer a rule when other months have transactions from the same merchant that it would cover.
+  // updatedMonth already has this edit, so the transaction itself isn't counted.
+  const offerRule = (
+    transaction: MonthTransaction,
+    target: Pick<CategoryRule, 'categoryId' | 'exclude'>,
+    updatedMonth: MonthData
+  ) => {
     const rule: CategoryRule = {
       id: createRuleId(),
       text: transactionKey(transaction),
@@ -82,24 +88,26 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
       createdAt: new Date().toISOString(),
     };
     if (!rule.text) return;
-    const months = await fileSystemManager.loadAllMonths();
+    const months = allMonths.map(m => (m.year === updatedMonth.year && m.month === updatedMonth.month ? updatedMonth : m));
     if (previewRule(rule, rules, months).matches > 0) {
       setRuleDraft({ rule, amount: transaction.amount });
     }
   };
 
-  const handleCategoryChange = async (transaction: MonthTransaction, categoryId: string) => {
-    await onSave(updateTransaction(monthData, transaction.id, { categoryId }));
-    await offerRule(transaction, { categoryId });
+  const handleCategoryChange = (transaction: MonthTransaction, categoryId: string) => {
+    const updated = updateTransaction(monthData, transaction.id, { categoryId });
+    onSave(updated);
+    offerRule(transaction, { categoryId }, updated);
   };
 
-  const handleIncludeToggle = async (transaction: MonthTransaction, included: boolean) => {
-    await onSave(updateTransaction(monthData, transaction.id, {
+  const handleIncludeToggle = (transaction: MonthTransaction, included: boolean) => {
+    const updated = updateTransaction(monthData, transaction.id, {
       excluded: !included,
       excludeReason: included ? undefined : 'Excluded manually',
-    }));
+    });
+    onSave(updated);
     if (!included) {
-      await offerRule(transaction, { categoryId: null, exclude: true });
+      offerRule(transaction, { categoryId: null, exclude: true }, updated);
     }
   };
 
@@ -259,6 +267,7 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
           offerSkip
           categories={categories}
           rules={rules}
+          months={allMonths}
           onSave={onSaveRule}
         />
       )}

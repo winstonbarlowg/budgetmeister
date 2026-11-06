@@ -15,6 +15,12 @@ import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 import { cn } from './lib/utils';
 
+// Swap one month into the list of all months (adding it if it's new)
+const withMonth = (months: MonthData[], data: MonthData) =>
+  months.some(m => m.year === data.year && m.month === data.month)
+    ? months.map(m => (m.year === data.year && m.month === data.month ? data : m))
+    : [...months, data].sort((a, b) => a.year - b.year || a.month - b.month);
+
 const NAV_ITEMS = [
   { id: 'monthly', label: 'Monthly Entry', icon: Calendar },
   { id: 'bank-transactions', label: 'Bank Transactions', icon: Upload },
@@ -29,6 +35,8 @@ function App() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [monthData, setMonthData] = useState<MonthData | null>(null);
+  // Every month in memory, for rules and suggestions; kept in step with each save
+  const [allMonths, setAllMonths] = useState<MonthData[]>([]);
   const [yearData, setYearData] = useState<MonthSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('monthly');
@@ -49,7 +57,8 @@ function App() {
       setConfig(loadedConfig);
 
       // Categorise anything imported since the app last ran
-      await fileSystemManager.applyRulesEverywhere(loadedConfig.categoryRules || []);
+      const applied = await fileSystemManager.applyRulesEverywhere(loadedConfig.categoryRules || []);
+      setAllMonths(applied.months);
 
       const loadedMonthData = await fileSystemManager.loadMonthData(currentYear, currentMonth);
       setMonthData(loadedMonthData);
@@ -96,14 +105,19 @@ function App() {
     const newConfig = { ...config, categoryRules, lastModified: new Date().toISOString() };
     try {
       await fileSystemManager.saveConfig(newConfig);
+      const result = await fileSystemManager.applyRulesEverywhere(categoryRules, allMonths.length ? allMonths : undefined);
+      // Rules and months change together, so nothing sees the new rules against old months
       setConfig(newConfig);
-      const result = await fileSystemManager.applyRulesEverywhere(categoryRules);
-      setMonthData(await fileSystemManager.loadMonthData(currentYear, currentMonth));
+      setAllMonths(result.months);
+      setMonthData(
+        result.months.find(m => m.year === currentYear && m.month === currentMonth) ||
+        await fileSystemManager.loadMonthData(currentYear, currentMonth)
+      );
       await loadYearData(undefined, newConfig);
       toast.success(
-        result.transactions === 0
+        result.changedTransactions === 0
           ? 'Rules saved. No transactions needed changing.'
-          : `Updated ${result.transactions} transaction${result.transactions === 1 ? '' : 's'} in ${result.months} month${result.months === 1 ? '' : 's'}.`
+          : `Updated ${result.changedTransactions} transaction${result.changedTransactions === 1 ? '' : 's'} in ${result.changedMonths} month${result.changedMonths === 1 ? '' : 's'}.`
       );
     } catch (err) {
       console.error('Failed to save rules:', err);
@@ -121,13 +135,16 @@ function App() {
   // Edits on the Monthly page save as they happen, so show them before the write finishes
   const handleSaveMonthData = async (data: MonthData) => {
     setMonthData(data);
+    setAllMonths(months => withMonth(months, data));
     try {
       await fileSystemManager.saveMonthData(data);
       await loadYearData();
     } catch (err) {
       console.error('Failed to save month data:', err);
       toast.error('Could not save your changes. Reloading this month from disk.');
-      setMonthData(await fileSystemManager.loadMonthData(data.year, data.month));
+      const saved = await fileSystemManager.loadMonthData(data.year, data.month);
+      setMonthData(saved);
+      setAllMonths(months => withMonth(months, saved));
     }
   };
 
@@ -299,6 +316,7 @@ function App() {
               <MonthTransactions
                 categories={config.categories}
                 monthData={monthData}
+                allMonths={allMonths}
                 rules={config.categoryRules || []}
                 onSave={handleSaveMonthData}
                 onSaveRule={handleSaveRule}
@@ -377,6 +395,7 @@ function App() {
                 // Save updated month data
                 const updatedMonthData = { ...targetMonthData, expenses: updatedExpenses };
                 await fileSystemManager.saveMonthData(updatedMonthData);
+                setAllMonths(months => withMonth(months, updatedMonthData));
 
                 // Refresh UI if current month
                 if (year === currentYear && month === currentMonth) {
@@ -388,6 +407,7 @@ function App() {
                 // Reload current month data and year data after import removal
                 const updatedMonthData = await fileSystemManager.loadMonthData(currentYear, currentMonth);
                 setMonthData(updatedMonthData);
+                setAllMonths(await fileSystemManager.loadAllMonths());
                 await loadYearData();
               }}
             />
@@ -423,6 +443,7 @@ function App() {
               <SettingsManager
                 categories={config.categories}
                 incomeSources={config.incomeSources}
+                allMonths={allMonths}
                 rules={config.categoryRules || []}
                 onSaveRules={handleSaveRules}
                 onSaveRule={handleSaveRule}
