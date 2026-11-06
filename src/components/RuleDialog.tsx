@@ -11,7 +11,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { CategoryCombobox } from './CategoryCombobox';
 import { MoneyInput } from './MoneyInput';
 
 const EXCLUDE_VALUE = '__exclude';
@@ -94,18 +94,16 @@ export const RuleDialog: React.FC<RuleDialogProps> = ({
         <div className="space-y-4">
           <div className="space-y-1.5">
             <Label>Category</Label>
-            <Select value={target} onValueChange={setTarget}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose category" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map(category => (
-                  <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
-                ))}
-                <SelectItem value={INCOME_CATEGORY_ID}>Income (not spending)</SelectItem>
-                <SelectItem value={EXCLUDE_VALUE}>Exclude from expenses</SelectItem>
-              </SelectContent>
-            </Select>
+            <CategoryCombobox
+              value={target || null}
+              onChange={setTarget}
+              categories={categories}
+              trailingOptions={[
+                { value: INCOME_CATEGORY_ID, label: 'Income (not spending)' },
+                { value: EXCLUDE_VALUE, label: 'Exclude from expenses' },
+              ]}
+              className="w-full"
+            />
           </div>
 
           <div className="space-y-1.5">

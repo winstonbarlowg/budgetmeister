@@ -18,7 +18,7 @@ import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { CategoryCombobox } from './CategoryCombobox';
 import { RuleDialog } from './RuleDialog';
 
 interface MonthTransactionsProps {
@@ -154,19 +154,14 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
                     </Button>
                   ))}
                 </div>
-                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-[180px] h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All categories</SelectItem>
-                    <SelectItem value="uncategorised">Uncategorised</SelectItem>
-                    {categories.map(category => (
-                      <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
-                    ))}
-                    <SelectItem value={INCOME_CATEGORY_ID}>Income</SelectItem>
-                  </SelectContent>
-                </Select>
+                <CategoryCombobox
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                  categories={categories}
+                  leadingOptions={[{ value: 'all', label: 'All categories' }, { value: 'uncategorised', label: 'Uncategorised' }]}
+                  trailingOptions={[{ value: INCOME_CATEGORY_ID, label: 'Income' }]}
+                  className="w-[180px] h-8"
+                />
                 <div className="relative flex-1 min-w-[180px]">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
@@ -239,21 +234,14 @@ export const MonthTransactions: React.FC<MonthTransactionsProps> = ({
                         {transaction.direction === 'credit' ? '+' : ''}
                         {formatCurrency(transaction.amount)}
                       </div>
-                      <Select
-                        value={transaction.categoryId || ''}
-                        onValueChange={value => handleCategoryChange(transaction, value)}
+                      <CategoryCombobox
+                        value={transaction.categoryId}
+                        onChange={value => handleCategoryChange(transaction, value)}
+                        categories={categories}
+                        trailingOptions={[{ value: INCOME_CATEGORY_ID, label: 'Income (not spending)' }]}
                         disabled={transaction.excluded}
-                      >
-                        <SelectTrigger className="w-[180px] h-8 shrink-0">
-                          <SelectValue placeholder="Choose category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map(category => (
-                            <SelectItem key={category.id} value={category.id}>{category.name}</SelectItem>
-                          ))}
-                          <SelectItem value={INCOME_CATEGORY_ID}>Income (not spending)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                        className="w-[180px] h-8 shrink-0"
+                      />
                     </div>
                   ))}
                 </div>
