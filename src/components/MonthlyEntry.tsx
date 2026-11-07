@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { ChevronLeft, ChevronRight, TrendingDown, TrendingUp, DollarSign, CalendarCheck, RotateCcw, Lock, ShoppingCart } from 'lucide-react';
-import { MonthData, Category, MonthSummary, BudgetConfig, IncomeSource, MonthlyExpense } from '../types';
+import { MonthData, Category, CategoryWithActual, MonthSummary, BudgetConfig, IncomeSource, MonthlyExpense } from '../types';
 import {
   calculateMonthSummary, formatCurrency, normalizeExpense, updateExpenseAmount,
   getEffectiveExpenses, getExpectedAmount,
@@ -8,6 +9,7 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
 import { Progress } from './ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { MonthlyIncomeEntry } from './MonthlyIncomeEntry';
 import { MonthlySavingsEntry } from './MonthlySavingsEntry';
 import { CurrencyInput } from './CurrencyInput';
@@ -21,6 +23,67 @@ interface MonthlyEntryProps {
   onSave: (data: MonthData) => void;
   onMonthChange: (year: number, month: number) => void;
 }
+
+type ExpenseSort = 'settings' | 'name' | 'amount-desc' | 'amount-asc';
+type ExpenseList = 'fixed' | 'variable';
+
+const SORT_OPTIONS: { value: ExpenseSort; label: string }[] = [
+  { value: 'settings', label: 'Settings order' },
+  { value: 'name', label: 'Name (A–Z)' },
+  { value: 'amount-desc', label: 'Amount: high to low' },
+  { value: 'amount-asc', label: 'Amount: low to high' },
+];
+
+// The chosen order is kept in this browser, so it stays the same when you change month
+const SORT_STORAGE_KEY = 'budgetmeister.expenseSort';
+
+const loadSorts = (): Record<ExpenseList, ExpenseSort> => {
+  const fallback: Record<ExpenseList, ExpenseSort> = { fixed: 'settings', variable: 'settings' };
+  try {
+    const saved = JSON.parse(localStorage.getItem(SORT_STORAGE_KEY) || '{}');
+    const valid = (v: unknown): v is ExpenseSort => SORT_OPTIONS.some(o => o.value === v);
+    return {
+      fixed: valid(saved.fixed) ? saved.fixed : fallback.fixed,
+      variable: valid(saved.variable) ? saved.variable : fallback.variable,
+    };
+  } catch {
+    return fallback;
+  }
+};
+
+const sortCategories = (
+  list: CategoryWithActual[],
+  sort: ExpenseSort,
+  amountOf: (category: CategoryWithActual) => number
+) => {
+  if (sort === 'settings') return list;
+  // Leading emoji are ignored, so "🏡 Mortgage" sorts under M
+  const sortName = (category: CategoryWithActual) => category.name.replace(/^[^\p{L}\p{N}]+/u, '');
+  const byName = (a: CategoryWithActual, b: CategoryWithActual) =>
+    sortName(a).localeCompare(sortName(b), undefined, { sensitivity: 'base' });
+  return [...list].sort((a, b) => {
+    if (sort === 'name') return byName(a, b);
+    const diff = amountOf(a) - amountOf(b);
+    return (sort === 'amount-asc' ? diff : -diff) || byName(a, b);
+  });
+};
+
+const SortSelect: React.FC<{ value: ExpenseSort; onChange: (value: ExpenseSort) => void; label: string }> = ({
+  value, onChange, label,
+}) => (
+  <Select value={value} onValueChange={v => onChange(v as ExpenseSort)}>
+    <SelectTrigger className="h-8 w-[180px] shrink-0 text-xs" aria-label={label}>
+      <SelectValue />
+    </SelectTrigger>
+    <SelectContent align="end">
+      {SORT_OPTIONS.map(option => (
+        <SelectItem key={option.value} value={option.value} className="text-xs">
+          {option.label}
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+);
 
 const emptyExpense = (categoryId: string): MonthlyExpense => ({
   categoryId,
@@ -41,6 +104,17 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
   // Saved amounts plus expected fixed costs from Settings, derived on every render
   const effectiveById = new Map(getEffectiveExpenses(categories, monthData).map(e => [e.categoryId, e]));
   const savedById = new Map(monthData.expenses.map(e => [e.categoryId, normalizeExpense(e) as MonthlyExpense]));
+
+  const [sorts, setSorts] = useState(loadSorts);
+  const changeSort = (list: ExpenseList, sort: ExpenseSort) => {
+    const next = { ...sorts, [list]: sort };
+    setSorts(next);
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // Not saved for next time, but this session still uses it
+    }
+  };
 
   const saveExpense = (expense: MonthlyExpense | null, categoryId: string) => {
     const others = monthData.expenses.filter(e => e.categoryId !== categoryId);
@@ -101,8 +175,9 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
 
   const summary: MonthSummary = calculateMonthSummary(config, monthData);
 
-  const fixedCategories = summary.categories.filter((c) => c.type === 'fixed');
-  const variableCategories = summary.categories.filter((c) => c.type === 'variable');
+  const amountOf = (category: CategoryWithActual) => effectiveById.get(category.id)?.actualAmount || 0;
+  const fixedCategories = sortCategories(summary.categories.filter((c) => c.type === 'fixed'), sorts.fixed, amountOf);
+  const variableCategories = sortCategories(summary.categories.filter((c) => c.type === 'variable'), sorts.variable, amountOf);
 
   const isUnderBudget = summary.variableVariance <= 0;
 
@@ -236,11 +311,14 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Fixed Expenses */}
         <Card>
-          <CardHeader>
-            <CardTitle>Fixed Expenses</CardTitle>
-            <CardDescription>
-              From transactions, or the expected amount in Settings when nothing is imported
-            </CardDescription>
+          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+            <div className="space-y-1">
+              <CardTitle>Fixed Expenses</CardTitle>
+              <CardDescription>
+                From transactions, or the expected amount in Settings when nothing is imported
+              </CardDescription>
+            </div>
+            <SortSelect value={sorts.fixed} onChange={sort => changeSort('fixed', sort)} label="Sort fixed expenses" />
           </CardHeader>
           <CardContent className="space-y-3">
             {fixedCategories.map((category) => {
@@ -304,11 +382,14 @@ export const MonthlyEntry: React.FC<MonthlyEntryProps> = ({
 
         {/* Variable Expenses */}
         <Card>
-          <CardHeader>
-            <CardTitle>Variable Expenses</CardTitle>
-            <CardDescription>
-              {formatCurrency(summary.variableActual)} / {formatCurrency(summary.variableBudget)}
-            </CardDescription>
+          <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+            <div className="space-y-1">
+              <CardTitle>Variable Expenses</CardTitle>
+              <CardDescription>
+                {formatCurrency(summary.variableActual)} / {formatCurrency(summary.variableBudget)}
+              </CardDescription>
+            </div>
+            <SortSelect value={sorts.variable} onChange={sort => changeSort('variable', sort)} label="Sort variable expenses" />
           </CardHeader>
           <CardContent className="space-y-3">
             {variableCategories.map((category) => {
