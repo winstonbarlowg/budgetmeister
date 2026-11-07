@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Edit2, Lightbulb, Plus, Trash2, Wand2 } from 'lucide-react';
 import { Category, CategoryRule, MonthData, MonthTransaction } from '../types';
 import { INCOME_CATEGORY_ID } from '../utils/monthTransactions';
 import {
-  createRuleId, hasAmountRange, isManuallyCategorised, normaliseRuleText, previewRule, transactionKey,
+  countRuleMatches, createRuleId, hasAmountRange, isManuallyCategorised, normaliseRuleText, previewRule,
+  transactionKey,
 } from '../utils/categoryRules';
 import { formatCurrency } from '../utils/calculations';
-import { fileSystemManager } from '../utils/fileSystem';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { useConfirm } from './ui/confirm-dialog';
@@ -14,6 +14,7 @@ import { RuleDialog } from './RuleDialog';
 
 interface RuleManagerProps {
   categories: Category[];
+  months: MonthData[];
   rules: CategoryRule[];
   onSaveRules: (rules: CategoryRule[]) => Promise<void>;
   onSaveRule: (rule: CategoryRule) => Promise<void>;
@@ -85,14 +86,9 @@ function buildSuggestions(months: MonthData[], rules: CategoryRule[]): Suggestio
   return suggestions.sort((a, b) => b.changes - a.changes);
 }
 
-export const RuleManager: React.FC<RuleManagerProps> = ({ categories, rules, onSaveRules, onSaveRule }) => {
+export const RuleManager: React.FC<RuleManagerProps> = ({ categories, months, rules, onSaveRules, onSaveRule }) => {
   const confirm = useConfirm();
-  const [months, setMonths] = useState<MonthData[]>([]);
   const [editing, setEditing] = useState<{ rule: CategoryRule; amount?: number } | null>(null);
-
-  useEffect(() => {
-    fileSystemManager.loadAllMonths().then(setMonths).catch(() => setMonths([]));
-  }, [rules]);
 
   const categoryName = (rule: CategoryRule) =>
     rule.exclude
@@ -108,10 +104,8 @@ export const RuleManager: React.FC<RuleManagerProps> = ({ categories, rules, onS
         ? formatCurrency(rule.minAmount || 0)
         : `${formatCurrency(rule.minAmount || 0)}–${formatCurrency(rule.maxAmount || 0)}`;
 
-  const matchCounts = useMemo(
-    () => new Map(rules.map(rule => [rule.id, previewRule(rule, rules, months).matches])),
-    [rules, months]
-  );
+  // Rules and months arrive together from App, so counts and suggestions always reflect saved rules
+  const matchCounts = useMemo(() => countRuleMatches(rules, months), [rules, months]);
   const suggestions = useMemo(() => buildSuggestions(months, rules), [months, rules]);
 
   const handleNew = () => setEditing({
@@ -215,6 +209,7 @@ export const RuleManager: React.FC<RuleManagerProps> = ({ categories, rules, onS
           amount={editing.amount}
           categories={categories}
           rules={rules}
+          months={months}
           onSave={onSaveRule}
         />
       )}

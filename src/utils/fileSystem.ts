@@ -226,19 +226,27 @@ export class FileSystemManager {
     return Promise.all(months.map(({ year, month }) => this.loadMonthData(year, month)));
   }
 
-  /** Apply category rules to every month, saving only the months that change */
-  async applyRulesEverywhere(rules: CategoryRule[]): Promise<{ transactions: number; months: number }> {
-    let transactions = 0;
-    let months = 0;
-    for (const monthData of await this.loadAllMonths()) {
+  /**
+   * Apply category rules to every month, saving only the months that change.
+   * Pass the months already in memory to skip reading them all again.
+   */
+  async applyRulesEverywhere(
+    rules: CategoryRule[],
+    currentMonths?: MonthData[]
+  ): Promise<{ months: MonthData[]; changedTransactions: number; changedMonths: number }> {
+    let changedTransactions = 0;
+    let changedMonths = 0;
+    const months: MonthData[] = [];
+    for (const monthData of currentMonths || await this.loadAllMonths()) {
       const result = applyRulesToMonth(monthData, rules);
       if (result.changedCount > 0) {
         await this.saveMonthData(result.monthData);
-        transactions += result.changedCount;
-        months++;
+        changedTransactions += result.changedCount;
+        changedMonths++;
       }
+      months.push(result.monthData);
     }
-    return { transactions, months };
+    return { months, changedTransactions, changedMonths };
   }
 
   isInitialized(): boolean {
